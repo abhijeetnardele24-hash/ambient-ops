@@ -14,6 +14,28 @@
 
 ---
 
+## 📸 Product Overview & Live Demo
+
+![AmbientOps Control Center](assets/screenshots/overview.png)
+
+### 🎥 Interactive Video Walkthrough
+An interactive video recording demonstrating real-time scenario triggering, Alexa+ audio speech synthesis, and live MCP protocol inspection is available in [assets/demo/ambient_ops_walkthrough.webp](assets/demo/ambient_ops_walkthrough.webp).
+
+---
+
+## 🖼️ Feature Gallery
+
+| Ring Vision Bounding Boxes & Immobility Alert | Night Anomaly & Autonomous Smart Lights |
+| :---: | :---: |
+| ![Care Immobility Alert](assets/screenshots/care_immobility.png) | ![Night Loitering Anomaly](assets/screenshots/night_loitering.png) |
+
+| Live MCP Protocol Inspector & Tool Runner | Official Developer Friction Log (+10% Bonus) |
+| :---: | :---: |
+| ![MCP Protocol Inspector](assets/screenshots/mcp_tool_execution.png) | ![Friction Log Modal](assets/screenshots/friction_log_modal.png) |
+
+
+---
+
 ## ⚡ What is AmbientOps?
 **AmbientOps** is a next-generation ambient operations copilot that eliminates smart home notification fatigue. Rather than blasting mobile devices with raw push alerts whenever a sensor trips, AmbientOps connects **Ring** computer vision feeds with **Amazon Bedrock (Claude 3.5 Sonnet)** through the open **Model Context Protocol (MCP)**. 
 
