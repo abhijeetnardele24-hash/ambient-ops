@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  ambient-ops:
+    build: .
+    container_name: ambient-ops-app
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - USE_BEDROCK_MOCK=true
+      - AWS_REGION=us-east-1
+    restart: unless-stopped

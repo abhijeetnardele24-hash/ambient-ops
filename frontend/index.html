@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AmbientOps — Autonomous Multi-Device MCP Agent for Alexa+ & Ring</title>
+  <meta name="description" content="Production Model Context Protocol (MCP) agent integrating Ring computer vision triggers with Amazon Bedrock reasoning and Alexa+ proactive voice dispatch.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="dark-theme">
+  <!-- Background Glow Orbs -->
+  <div class="ambient-glow orb-1"></div>
+  <div class="ambient-glow orb-2"></div>
+  <div class="ambient-glow orb-3"></div>
+
+  <!-- Top Navigation Bar -->
+  <header class="top-nav">
+    <div class="nav-brand">
+      <div class="brand-logo">
+        <span class="logo-core"></span>
+        <span class="logo-ring"></span>
+      </div>
+      <div>
+        <h1 class="brand-title">AmbientOps <span class="badge-beta">MCP 2025-11-25</span></h1>
+        <p class="brand-sub">Amazon Developer Hackathon 2026 • Alexa+ & Ring Autonomous Agent</p>
+      </div>
+    </div>
+
+    <!-- Live System Telemetry Badges -->
+    <div class="nav-telemetry">
+      <div class="telemetry-pill">
+        <span class="status-dot green pulse"></span>
+        <span class="label">MCP Transport:</span>
+        <strong id="transportStatus">Streamable SSE</strong>
+      </div>
+      <div class="telemetry-pill">
+        <span class="status-dot blue"></span>
+        <span class="label">Reasoning:</span>
+        <strong>Bedrock Claude 3.5</strong>
+      </div>
+      <div class="telemetry-pill">
+        <span class="status-dot purple"></span>
+        <span class="label">Ring Playground:</span>
+        <strong id="deviceCount">4 Devices Online</strong>
+      </div>
+      <button id="frictionLogBtn" class="btn btn-secondary btn-sm" onclick="openFrictionLogModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        Friction Log (+10% Bonus)
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Three-Panel Dashboard Grid -->
+  <main class="dashboard-grid">
+
+    <!-- PANEL 1: Ring Vision Playground & Environmental Feeds -->
+    <section class="panel glass-card panel-ring">
+      <div class="panel-header">
+        <div class="panel-title-wrap">
+          <span class="icon-indicator ring-accent"></span>
+          <h2>Ring Vision Playground</h2>
+        </div>
+        <span class="feed-live-badge"><span class="pulse-dot"></span> LIVE SIMULATOR</span>
+      </div>
+
+      <!-- Camera Viewport Canvas -->
+      <div class="camera-viewport-container">
+        <div class="viewport-overlay-top">
+          <span class="camera-id-tag" id="currentCameraName">Front Porch Video Doorbell Pro</span>
+          <span class="timestamp-tag" id="liveTimestamp">12:00:00 PM</span>
+        </div>
+
+        <!-- Simulated SVG / Canvas Feed -->
+        <div class="camera-stage" id="cameraStage">
+          <svg id="sceneCanvas" viewBox="0 0 640 360" class="scene-svg">
+            <defs>
+              <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#121826"/>
+                <stop offset="100%" stop-color="#1f293d"/>
+              </linearGradient>
+            </defs>
+            <rect width="640" height="360" fill="url(#skyGrad)"/>
+            <path d="M 0 260 L 320 200 L 640 260 L 640 360 L 0 360 Z" fill="#0f141f"/>
+            <rect x="240" y="160" width="160" height="120" fill="#182234" stroke="#2d3d59" stroke-width="2"/>
+            <rect x="290" y="200" width="60" height="80" fill="#293952"/>
+            <!-- Dynamic Detections Container -->
+            <g id="svgDetections"></g>
+          </svg>
+        </div>
+
+        <div class="viewport-overlay-bottom">
+          <div class="telemetry-stat">
+            <span class="stat-label">Precipitation:</span>
+            <span class="stat-val" id="telemetryRain">92%</span>
+          </div>
+          <div class="telemetry-stat">
+            <span class="stat-label">Ambient Lux:</span>
+            <span class="stat-val" id="telemetryLux">420 lx</span>
+          </div>
+          <div class="telemetry-stat">
+            <span class="stat-label">CV Confidence:</span>
+            <span class="stat-val text-green" id="telemetryConfidence">0.96</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Scenario Launchers -->
+      <div class="scenarios-control-box">
+        <h3 class="section-subheading">Trigger Simulated Ring Scenarios</h3>
+        <div class="scenario-buttons-grid">
+          <button class="btn btn-scenario active" onclick="triggerScenario('delivery_weather_risk')">
+            <span class="sc-icon">📦</span>
+            <div class="sc-text">
+              <strong>Package in Rain</strong>
+              <small>Incoming rain + front steps</small>
+            </div>
+          </button>
+          <button class="btn btn-scenario" onclick="triggerScenario('elder_immobility_alert')">
+            <span class="sc-icon">👵</span>
+            <div class="sc-text">
+              <strong>Care Immobility</strong>
+              <small>52m motionless + meds overdue</small>
+            </div>
+          </button>
+          <button class="btn btn-scenario" onclick="triggerScenario('pet_escape_risk')">
+            <span class="sc-icon">🐕</span>
+            <div class="sc-text">
+              <strong>Pet Escape Risk</strong>
+              <small>Unlatched perimeter gate</small>
+            </div>
+          </button>
+          <button class="btn btn-scenario" onclick="triggerScenario('nocturnal_perimeter_anomaly')">
+            <span class="sc-icon">🚨</span>
+            <div class="sc-text">
+              <strong>2:15 AM Loitering</strong>
+              <small>Unidentified presence near car</small>
+            </div>
+          </button>
+          <button class="btn btn-scenario" onclick="triggerScenario('routine_postal_visit')">
+            <span class="sc-icon">📮</span>
+            <div class="sc-text">
+              <strong>Routine Postal Mail</strong>
+              <small>Silent timeline log only</small>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Ring Device Fleet Status -->
+      <div class="device-fleet-box">
+        <h3 class="section-subheading">Connected Ring Device Fleet</h3>
+        <div class="fleet-list" id="fleetList">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- PANEL 2: Alexa+ Ambient Voice & Reasoning Console -->
+    <section class="panel glass-card panel-alexa">
+      <div class="panel-header">
+        <div class="panel-title-wrap">
+          <span class="icon-indicator alexa-accent"></span>
+          <h2>Alexa+ Ambient Voice Console</h2>
+        </div>
+        <div class="audio-toggle-wrap">
+          <button id="speechToggleBtn" class="btn btn-icon-round" title="Toggle Spoken Speech Synthesis" onclick="toggleAudioSpeech()">
+            <svg id="speechIconOn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Alexa+ Holographic Orb & Waveform -->
+      <div class="alexa-orb-container">
+        <div class="alexa-glow-orb" id="alexaOrb">
+          <div class="orb-inner"></div>
+        </div>
+        <div class="waveform-visualizer" id="waveform">
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        </div>
+        <div class="orb-status" id="orbStatus">Listening for ambient triggers...</div>
+      </div>
+
+      <!-- Bedrock Cognitive Triage Card -->
+      <div class="bedrock-card glass-subcard">
+        <div class="bedrock-header">
+          <span class="badge-tech">AWS BEDROCK • CLAUDE 3.5</span>
+          <span class="latency-tag" id="bedrockLatency">Latency: 184ms</span>
+        </div>
+        
+        <div class="triage-metrics-row">
+          <div class="metric-circle-box">
+            <div class="circular-progress" id="riskScoreGauge" style="--val: 68;">
+              <span class="risk-number" id="riskScoreVal">68</span>
+            </div>
+            <span class="metric-label">Risk Index</span>
+          </div>
+          <div class="metric-details">
+            <div class="metric-item">
+              <span class="m-key">Severity Level:</span>
+              <span class="badge-severity moderate" id="severityBadge">MODERATE</span>
+            </div>
+            <div class="metric-item">
+              <span class="m-key">Interruption:</span>
+              <span class="badge-interrupt" id="interruptBadge">VOICE DISPATCH ACTIVE</span>
+            </div>
+            <div class="metric-item">
+              <span class="m-key">Model Engine:</span>
+              <span class="m-val mono" id="modelEngine">Claude 3.5 Sonnet</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="reasoning-summary-box">
+          <h4 class="subhead-small">Bedrock Chain of Reasoning:</h4>
+          <p id="reasoningText" class="reasoning-text">
+            Package left on exposed porch steps. Precipitation probability is 92% in 15 minutes. Immediate vocal triage recommended to prevent water damage.
+          </p>
+        </div>
+      </div>
+
+      <!-- Spoken Alexa+ Speech Bubble -->
+      <div class="speech-bubble-card glass-subcard">
+        <div class="speech-bubble-header">
+          <span class="badge-speaker">ALEXA+ SPOKEN DIALOGUE</span>
+          <button class="btn btn-sm btn-ghost" onclick="speakCurrentPrompt()">Replay Speech 🔊</button>
+        </div>
+        <p class="spoken-prompt-text" id="spokenPromptText">
+          "Excuse me, Abhijeet. Your Ring Porch camera detected a package delivery, and rain is forecast in 15 minutes. Would you like me to unlock the porch storage bench or alert you when you head downstairs?"
+        </p>
+      </div>
+
+      <!-- Autonomous Smart Home Actions Executed -->
+      <div class="executed-actions-box glass-subcard">
+        <h4 class="subhead-small">Autonomous Smart Home Remediations</h4>
+        <div class="actions-list" id="actionsList">
+          <div class="action-tag success"><span>✓</span> unlock_porch_storage</div>
+          <div class="action-tag success"><span>✓</span> log_delivery_ledger</div>
+          <div class="action-tag success"><span>✓</span> remind_in_10_minutes</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PANEL 3: Live Model Context Protocol (MCP) Inspector -->
+    <section class="panel glass-card panel-mcp">
+      <div class="panel-header">
+        <div class="panel-title-wrap">
+          <span class="icon-indicator mcp-accent"></span>
+          <h2>Live MCP Protocol Inspector</h2>
+        </div>
+        <div class="mcp-filter-tabs">
+          <button class="tab-btn active" onclick="filterMcp('all')">All</button>
+          <button class="tab-btn" onclick="filterMcp('tools')">Tools</button>
+          <button class="tab-btn" onclick="filterMcp('resources')">Resources</button>
+        </div>
+      </div>
+
+      <div class="mcp-meta-bar">
+        <span>Spec: <strong>JSON-RPC 2.0 (v2025-11-25)</strong></span>
+        <span>Events Tracked: <strong id="mcpCount">0</strong></span>
+        <button class="btn btn-xs btn-ghost" onclick="clearMcpLog()">Clear Log</button>
+      </div>
+
+      <!-- Live Stream Log Container -->
+      <div class="mcp-log-container" id="mcpLogContainer">
+        <!-- Populated dynamically by app.js -->
+      </div>
+
+      <!-- Interactive MCP Tool Executor for Judges -->
+      <div class="mcp-test-runner glass-subcard">
+        <h4 class="subhead-small">Interactive Judge Tool Execution</h4>
+        <div class="tool-runner-inputs">
+          <select id="judgeToolSelect" class="select-tool" onchange="updateToolParamsPlaceholder()">
+            <option value="ring_poll_events">ring_poll_events</option>
+            <option value="ring_trigger_scenario">ring_trigger_scenario</option>
+            <option value="bedrock_reason_triage">bedrock_reason_triage</option>
+            <option value="alexa_proactive_dispatch">alexa_proactive_dispatch</option>
+            <option value="household_action_execute">household_action_execute</option>
+          </select>
+          <input type="text" id="judgeToolArgs" class="input-tool-args" placeholder='{"limit": 2}'>
+          <button class="btn btn-primary btn-sm" onclick="executeJudgeTool()">Call Tool</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Friction Log Modal -->
+  <div id="frictionModal" class="modal-backdrop">
+    <div class="modal-card glass-card">
+      <div class="modal-header">
+        <h3>Amazon Developer Experience Friction Log (+10% Bonus)</h3>
+        <button class="btn-close" onclick="closeFrictionLogModal()">&times;</button>
+      </div>
+      <div class="modal-body markdown-body" id="frictionLogContent">
+        <p>Loading friction log report...</p>
+      </div>
+      <div class="modal-footer">
+        <span class="text-muted">Submitted as part of official Devpost deliverables for Amazon App Dev Hackathon 2026</span>
+        <button class="btn btn-secondary" onclick="closeFrictionLogModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
