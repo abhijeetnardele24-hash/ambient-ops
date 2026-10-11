@@ -2,8 +2,7 @@
 
 import json
 from unittest.mock import MagicMock, patch
-import pytest
-from backend.bedrock_agent import BedrockAgent, TriageDecision
+from backend.bedrock_agent import BedrockAgent
 from backend.config import settings
 
 

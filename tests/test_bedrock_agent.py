@@ -1,6 +1,5 @@
 """Test Suite for Amazon Bedrock / AgentCore Reasoning Engine."""
 
-import pytest
 from backend.bedrock_agent import BedrockAgent
 
 

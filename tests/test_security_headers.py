@@ -1,6 +1,5 @@
 """Test Suite for Security Headers, Tracing, and CORS Policies."""
 
-import pytest
 from fastapi.testclient import TestClient
 from backend.server import app
 

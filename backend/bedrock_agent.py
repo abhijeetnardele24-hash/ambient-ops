@@ -6,7 +6,7 @@ with explicit provider mode telemetry (bedrock-live, deterministic-simulator, de
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 from .config import settings
@@ -17,15 +17,15 @@ logger = logging.getLogger("ambient_ops.bedrock")
 class TriageDecision(BaseModel):
     risk_score: int = Field(ge=0, le=100)
     confidence_score: float = Field(ge=0.0, le=1.0)
-    severity: str  # low, moderate, critical
+    severity: Literal["low", "moderate", "critical"]
     should_interrupt_user: bool
-    decision_rationale: str
-    recommended_action: str
-    suggested_actions: List[str]
-    spoken_alexa_prompt: str
-    provider_mode: str  # bedrock-live, deterministic-simulator, degraded
-    model_used: str
-    measured_latency_ms: float
+    decision_rationale: str = Field(max_length=500)
+    recommended_action: str = Field(max_length=100)
+    suggested_actions: List[str] = Field(default_factory=list)
+    spoken_alexa_prompt: str = Field(max_length=500)
+    provider_mode: Literal["bedrock-live", "deterministic-simulator", "degraded"]
+    model_used: str = Field(max_length=120)
+    measured_latency_ms: float = Field(ge=0.0)
     request_id: Optional[str] = None
 
 
@@ -33,7 +33,7 @@ class BedrockAgent:
     """Evaluates smart entry incidents using Amazon Bedrock or deterministic simulation."""
 
     def __init__(self):
-        self.provider_mode = "deterministic-simulator"
+        self.provider_mode: Literal["bedrock-live", "deterministic-simulator", "degraded"] = "deterministic-simulator"
         self.boto_client = None
         self._initialize_client()
 
@@ -46,16 +46,21 @@ class BedrockAgent:
 
         try:
             import boto3
-            from botocore.exceptions import NoCredentialsError, ClientError
+            from botocore.config import Config
 
-            # Use standard boto3 credential chain (env, config, IAM roles, SSO)
             session = boto3.Session(region_name=settings.aws_region)
             credentials = session.get_credentials()
 
             if credentials and credentials.access_key:
+                bedrock_cfg = Config(
+                    connect_timeout=settings.bedrock_connect_timeout,
+                    read_timeout=settings.bedrock_read_timeout,
+                    retries={"max_attempts": settings.bedrock_max_retries, "mode": "standard"},
+                )
                 self.boto_client = session.client(
                     "bedrock-runtime",
                     region_name=settings.aws_region,
+                    config=bedrock_cfg,
                 )
                 self.provider_mode = "bedrock-live"
                 logger.info(
@@ -70,7 +75,7 @@ class BedrockAgent:
         except Exception as e:
             logger.warning(
                 "Could not initialize live Bedrock client (%s). Using deterministic simulator.",
-                str(e),
+                type(e).__name__,
             )
             self.provider_mode = "deterministic-simulator"
 
@@ -96,7 +101,8 @@ class BedrockAgent:
         """Evaluates an ambient smart entry event and generates structured decision rationale."""
         if resident_context is None:
             resident_context = {
-                "household_name": "Nardele Residence",
+                "household_name": settings.household_name,
+                "resident_display_name": settings.resident_display_name,
                 "quiet_hours_active": False,
                 "current_mode": "home_normal",
             }
@@ -115,14 +121,14 @@ class BedrockAgent:
             except Exception as e:
                 logger.error(
                     "Live Bedrock invocation failed (%s). Transitioning to degraded mode.",
-                    str(e),
+                    type(e).__name__,
                 )
                 return self._invoke_fallback_degraded(
                     event_summary,
                     device_name,
                     detections,
                     ambient_conditions,
-                    error_message=str(e),
+                    error_message=f"Bedrock service error: {type(e).__name__}",
                     request_id=request_id,
                 )
 
@@ -183,15 +189,19 @@ Respond strictly in valid JSON with this exact schema:
 
         parsed = json.loads(raw_text.strip())
 
+        sev = str(parsed["severity"]).lower()
+        if sev not in ("low", "moderate", "critical"):
+            sev = "moderate"
+
         return TriageDecision(
             risk_score=int(parsed["risk_score"]),
             confidence_score=float(parsed.get("confidence_score", 0.95)),
-            severity=str(parsed["severity"]).lower(),
+            severity=sev,  # type: ignore
             should_interrupt_user=bool(parsed["should_interrupt_user"]),
-            decision_rationale=str(parsed["decision_rationale"]),
-            recommended_action=str(parsed.get("recommended_action", "log_timeline")),
-            suggested_actions=list(parsed.get("suggested_actions", [])),
-            spoken_alexa_prompt=str(parsed["spoken_alexa_prompt"]),
+            decision_rationale=str(parsed["decision_rationale"])[:500],
+            recommended_action=str(parsed.get("recommended_action", "log_timeline"))[:100],
+            suggested_actions=[str(a)[:100] for a in parsed.get("suggested_actions", [])[:10]],
+            spoken_alexa_prompt=str(parsed["spoken_alexa_prompt"])[:500],
             provider_mode="bedrock-live",
             model_used=settings.bedrock_model_id,
             measured_latency_ms=latency,
@@ -215,6 +225,7 @@ Respond strictly in valid JSON with this exact schema:
 
         time.sleep(0.015)  # Realistic simulation elapsed time
         latency = round((time.perf_counter() - t0) * 1000, 2)
+        resident_name = settings.resident_display_name
 
         if "package" in summary_lower or "rain" in summary_lower or any("package" in lbl for lbl in detection_labels):
             return TriageDecision(
@@ -229,7 +240,7 @@ Respond strictly in valid JSON with this exact schema:
                     "log_delivery_ledger",
                     "remind_in_10_minutes",
                 ],
-                spoken_alexa_prompt="Excuse me, Abhijeet. Your front porch camera observed a package delivery, and rain is forecast in 15 minutes. Would you like me to unlock the porch storage bench?",
+                spoken_alexa_prompt=f"Excuse me, {resident_name}. Your front porch camera observed a package delivery, and rain is forecast in 15 minutes. Would you like me to unlock the porch storage bench?",
                 provider_mode="deterministic-simulator",
                 model_used=f"{settings.bedrock_model_id} (Deterministic Simulator)",
                 measured_latency_ms=latency,
@@ -254,7 +265,7 @@ Respond strictly in valid JSON with this exact schema:
                     "prepare_emergency_contact_sms",
                     "illuminate_hallway_safety_path",
                 ],
-                spoken_alexa_prompt="Hello Abhijeet, this is an ambient wellness check. I noticed you haven't moved from the hallway for a while and your scheduled medication was due 30 minutes ago. Are you feeling alright?",
+                spoken_alexa_prompt=f"Hello {resident_name}, this is an ambient wellness check. I noticed you haven't moved from the hallway for a while and your scheduled medication was due 30 minutes ago. Are you feeling alright?",
                 provider_mode="deterministic-simulator",
                 model_used=f"{settings.bedrock_model_id} (Deterministic Simulator)",
                 measured_latency_ms=latency,
@@ -273,7 +284,7 @@ Respond strictly in valid JSON with this exact schema:
                     "notify_mobile_push",
                     "trigger_smart_lock_latch",
                 ],
-                spoken_alexa_prompt="Quick alert: The backyard camera shows your dog is heading toward the open side gate. Would you like me to sound a chime and secure the latch?",
+                spoken_alexa_prompt="Quick alert: The backyard camera shows your pet is heading toward the open side gate. Would you like me to sound a chime and secure the latch?",
                 provider_mode="deterministic-simulator",
                 model_used=f"{settings.bedrock_model_id} (Deterministic Simulator)",
                 measured_latency_ms=latency,
@@ -292,7 +303,7 @@ Respond strictly in valid JSON with this exact schema:
                     "record_cloud_evidence_clip",
                     "prompt_siren_confirmation",
                 ],
-                spoken_alexa_prompt="Abhijeet, sorry to disturb you. Your driveway camera noticed an unrecognized person loitering near your car for over a minute. I have switched on exterior lighting. Would you like to sound the perimeter chime?",
+                spoken_alexa_prompt=f"{resident_name}, sorry to disturb you. Your driveway camera noticed an unrecognized person loitering near your car for over a minute. I have switched on exterior lighting. Would you like to sound the perimeter chime?",
                 provider_mode="deterministic-simulator",
                 model_used=f"{settings.bedrock_model_id} (Deterministic Simulator)",
                 measured_latency_ms=latency,
@@ -323,13 +334,20 @@ Respond strictly in valid JSON with this exact schema:
         error_message: str,
         request_id: Optional[str],
     ) -> TriageDecision:
-        """Explicit degraded mode when live cloud service fails."""
+        """Explicit degraded mode when live cloud service fails. Sanitizes external error."""
+        # Sanitize error: never return raw AWS traceback or exception to clients
+        sanitized_summary = "Service unavailable or timeout"
+        if "Timeout" in error_message:
+            sanitized_summary = "Inference timeout exceeded"
+        elif "Credentials" in error_message or "AccessDenied" in error_message:
+            sanitized_summary = "Authentication check required"
+
         return TriageDecision(
             risk_score=50,
             confidence_score=0.50,
             severity="moderate",
             should_interrupt_user=False,
-            decision_rationale=f"Cloud Bedrock invocation degraded ({error_message[:80]}). Operating in safe contingency mode without autonomous escalation.",
+            decision_rationale=f"Cloud Bedrock invocation degraded ({sanitized_summary}). Operating in safe contingency mode without autonomous escalation.",
             recommended_action="log_degraded_warning",
             suggested_actions=["log_degraded_warning"],
             spoken_alexa_prompt="AmbientOps alert: Service is operating in offline contingency mode. Sensor event logged.",

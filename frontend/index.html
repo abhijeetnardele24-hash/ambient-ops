@@ -12,30 +12,48 @@
 </head>
 <body>
 
+  <!-- Screen Reader Live Announcements -->
+  <div id="ariaLiveRegion" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
   <!-- Top System Header -->
   <header class="top-header" role="banner">
     <div class="brand-section">
       <div class="brand-mark" aria-hidden="true">AO</div>
       <div class="brand-title-wrap">
-        <h1>AmbientOps <span class="mode-badge simulated">SIMULATED DEVICES</span></h1>
-        <p>Amazon AppDev 2026 • Alexa+ MCP & Amazon Bedrock Incident Response Console</p>
+        <h1>AmbientOps <span class="mode-badge simulated">SIMULATED ENTRY DEVICES</span></h1>
+        <p>Amazon AppDev 2026 • Alexa+ MCP &amp; Amazon Bedrock Incident Response Console</p>
       </div>
     </div>
 
     <!-- Live Telemetry Badges (Text + Shape + Color) -->
     <div class="system-status-ribbon" role="region" aria-label="System status modes">
-      <div class="mode-badge connected" id="transportBadge">
-        <span aria-hidden="true">●</span> MCP SSE: CONNECTED
+      <div class="mode-badge disconnected" id="mcpStatusBadge" data-testid="mcp-status-badge">
+        <span class="status-indicator" aria-hidden="true">○</span> <span id="mcpStatusText">MCP: DISCONNECTED</span>
       </div>
-      <div class="mode-badge mock" id="providerBadge">
+      <div class="mode-badge mock" id="engineModeBadge" data-testid="engine-mode-badge">
         <span aria-hidden="true">■</span> ENGINE: DETERMINISTIC SIMULATOR
       </div>
-      <div class="mode-badge simulated" id="deviceBadge">
-        <span aria-hidden="true">▲</span> 4 ENTRY SENSORS
+      <div class="mode-badge simulated" id="sensorFleetBadge" data-testid="sensor-fleet-badge">
+        <span aria-hidden="true">▲</span> 4 SENSORS (SIMULATED)
       </div>
-      <button id="openFrictionBtn" class="btn btn-secondary btn-sm" onclick="openFrictionModal()" aria-haspopup="dialog">
-        Friction Log (+10% Bonus)
-      </button>
+      <div class="mode-badge simulated" data-testid="speech-mode-badge">
+        <span aria-hidden="true">🔊</span> SPEECH: WEB SPEECH SIM
+      </div>
+
+      <div class="header-action-group">
+        <button id="btnRunMcpVerify" class="btn btn-primary btn-sm" onclick="runMcpVerification()" data-testid="mcp-verify-btn">
+          Verify MCP Handshake
+        </button>
+        <button id="btnReconnectMcp" class="btn btn-secondary btn-sm" onclick="reconnectMcpSession()" data-testid="mcp-reconnect-btn">
+          Reconnect MCP
+        </button>
+        <button id="btnResetDemo" class="btn btn-secondary btn-sm" onclick="resetToDemoState()" data-testid="reset-demo-btn">
+          Reset Demo
+        </button>
+        <button id="openFrictionBtn" class="btn btn-secondary btn-sm" onclick="openFrictionModal()" aria-haspopup="dialog" data-testid="friction-log-btn">
+          Friction Log
+        </button>
+      </div>
     </div>
   </header>
 
@@ -50,29 +68,44 @@
       </div>
       <div class="panel-body">
         <nav class="scenario-rail" aria-label="Incident scenarios">
-          <button class="scenario-card-btn active" onclick="selectScenario('delivery_weather_risk')" id="btn-delivery_weather_risk">
-            <span class="sc-title"><span>Package in Rain</span> <strong>92% Rain</strong></span>
+          <button class="scenario-card-btn active" onclick="selectScenario('delivery_weather_risk')" id="btn-delivery_weather_risk" data-testid="scenario-rain">
+            <span class="sc-title">
+              <span class="sc-name">Package in Rain</span>
+              <span class="sc-tag">92% Rain</span>
+            </span>
             <span class="sc-desc">Courier left box on exposed steps; storm imminent.</span>
           </button>
 
-          <button class="scenario-card-btn" onclick="selectScenario('elder_immobility_alert')" id="btn-elder_immobility_alert">
-            <span class="sc-title"><span>Care Inactivity</span> <strong>52m Dwell</strong></span>
+          <button class="scenario-card-btn" onclick="selectScenario('elder_immobility_alert')" id="btn-elder_immobility_alert" data-testid="scenario-elder">
+            <span class="sc-title">
+              <span class="sc-name">Care Inactivity</span>
+              <span class="sc-tag">52m Dwell</span>
+            </span>
             <span class="sc-desc">Stationary dwell in hallway; medication overdue.</span>
           </button>
 
-          <button class="scenario-card-btn" onclick="selectScenario('pet_escape_risk')" id="btn-pet_escape_risk">
-            <span class="sc-title"><span>Pet Perimeter Risk</span> <strong>Gate Open</strong></span>
-            <span class="sc-desc">Canine heading toward unlatched perimeter gate.</span>
+          <button class="scenario-card-btn" onclick="selectScenario('pet_escape_risk')" id="btn-pet_escape_risk" data-testid="scenario-pet">
+            <span class="sc-title">
+              <span class="sc-name">Pet Perimeter Risk</span>
+              <span class="sc-tag">Gate Open</span>
+            </span>
+            <span class="sc-desc">Family pet approaching unlatched perimeter gate.</span>
           </button>
 
-          <button class="scenario-card-btn" onclick="selectScenario('nocturnal_perimeter_anomaly')" id="btn-nocturnal_perimeter_anomaly">
-            <span class="sc-title"><span>2:15 AM Loitering</span> <strong>Night Anomaly</strong></span>
-            <span class="sc-desc">Unrecognized presence near vehicle driver side.</span>
+          <button class="scenario-card-btn" onclick="selectScenario('nocturnal_perimeter_anomaly')" id="btn-nocturnal_perimeter_anomaly" data-testid="scenario-loitering">
+            <span class="sc-title">
+              <span class="sc-name">2:15 AM Loitering</span>
+              <span class="sc-tag">Night Anomaly</span>
+            </span>
+            <span class="sc-desc">Unrecognized presence near vehicle driver door.</span>
           </button>
 
-          <button class="scenario-card-btn" onclick="selectScenario('routine_postal_visit')" id="btn-routine_postal_visit">
-            <span class="sc-title"><span>Routine Postal Mail</span> <strong>Normal Log</strong></span>
-            <span class="sc-desc">Standard carrier deposit; silent ledger logging.</span>
+          <button class="scenario-card-btn" onclick="selectScenario('routine_postal_visit')" id="btn-routine_postal_visit" data-testid="scenario-routine">
+            <span class="sc-title">
+              <span class="sc-name">Routine Postal Mail</span>
+              <span class="sc-tag">Normal Log</span>
+            </span>
+            <span class="sc-desc">Standard carrier deposit; silent timeline logging.</span>
           </button>
         </nav>
 
@@ -80,7 +113,7 @@
           <div class="panel-header" style="padding: 8px 0; margin-top: 6px;">
             <h3>Device Fleet (Simulated)</h3>
           </div>
-          <div class="device-catalog-list" id="deviceCatalogList">
+          <div class="device-catalog-list" id="deviceCatalogList" data-testid="device-catalog-list">
             <!-- Populated securely by JS -->
           </div>
         </section>
@@ -117,9 +150,11 @@
       <article class="approval-boundary-card" aria-label="Operator approval boundary">
         <header class="approval-header">
           <div class="gate-title">
-            <span>Human Approval Boundary</span>
+            <span>Human Operator Approval Boundary</span>
           </div>
-          <span class="gate-badge pending" id="approvalStatusBadge">AWAITING OPERATOR APPROVAL</span>
+          <span class="gate-badge pending" id="approvalStatusBadge" data-testid="approval-status-badge">
+            AWAITING OPERATOR APPROVAL
+          </span>
         </header>
 
         <div class="evidence-rationale-grid">
@@ -147,19 +182,19 @@
             <small style="color: var(--text-muted);">Operator sequence: Trigger &rarr; Observe &rarr; Analyze &rarr; Review &rarr; <strong>Approve</strong></small>
           </div>
           <div class="btn-group">
-            <button class="btn btn-danger btn-sm" id="btnReject" onclick="rejectCurrentIncident()">
+            <button class="btn btn-danger" id="btnReject" onclick="rejectCurrentIncident()" data-testid="operator-reject-btn">
               Dismiss / Reject
             </button>
-            <button class="btn btn-primary" id="btnApprove" onclick="approveCurrentIncident()">
+            <button class="btn btn-primary" id="btnApprove" onclick="approveCurrentIncident()" data-testid="operator-approve-btn">
               Approve Simulation &rarr;
             </button>
           </div>
         </footer>
 
         <!-- Verified Outcome Block -->
-        <div id="verifiedOutcomeBlock" style="padding-top: 8px; border-top: 1px dashed var(--border-structural); display: none;">
+        <div id="verifiedOutcomeBlock" class="verified-outcome-block" data-testid="verified-outcome-block" style="display: none;">
           <small style="color: var(--status-success-text); font-weight: 700; font-family: var(--font-mono);">
-            &check; SIMULATED OUTCOME VERIFIED &bull; Hardware actions executed &amp; logged to incident ledger.
+            &check; SIMULATED OUTCOME VERIFIED &bull; Hardware actions executed &amp; logged to audit ledger.
           </small>
         </div>
       </article>
@@ -167,13 +202,13 @@
       <!-- Spoken Alexa+ Ambient Voice Output -->
       <article class="alexa-voice-card" aria-label="Alexa voice dispatch">
         <header class="alexa-voice-header">
-          <span class="voice-title">Alexa+ Proactive Voice Dispatch (MCP Tool)</span>
-          <button class="btn btn-secondary btn-sm" onclick="speakCurrentTranscript()" aria-label="Replay vocal prompt">
+          <span class="voice-title">Alexa+ Proactive Voice Dispatch (Browser Web Speech Simulation)</span>
+          <button class="btn btn-secondary btn-sm" id="btnReplayVoice" onclick="speakCurrentTranscript()" aria-label="Replay vocal prompt" data-testid="replay-voice-btn">
             Replay Voice &bull;
           </button>
         </header>
-        <p class="spoken-transcript" id="spokenTranscriptText">
-          "Excuse me, Abhijeet. Your front porch camera observed a package delivery, and rain is forecast in 15 minutes. Would you like me to unlock the porch storage bench?"
+        <p class="spoken-transcript" id="spokenTranscriptText" data-testid="spoken-transcript-text">
+          "Excuse me, Resident. Your front porch camera observed a package delivery, and rain is forecast in 15 minutes. Would you like me to unlock the porch storage bench?"
         </p>
       </article>
 
@@ -183,37 +218,33 @@
     <aside class="panel protocol-inspector" aria-label="Model Context Protocol runtime inspector">
       <div class="panel-header">
         <h3>Live MCP Inspector</h3>
-        <span class="mode-badge mock">v2025-11-25</span>
+        <span class="mode-badge mock" id="negotiatedVersionBadge">v2025-11-25</span>
       </div>
 
       <div class="panel-body">
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: var(--text-muted);">
-          <span>Messages: <strong id="mcpMsgCount">0</strong></span>
-          <button class="btn btn-secondary btn-sm" onclick="clearMcpDisplay()">Clear</button>
+        <div class="inspector-meta-row">
+          <span>Session: <strong id="activeSessionIdText" class="session-id-display">None</strong></span>
+          <button class="btn btn-secondary btn-sm" onclick="clearMcpDisplay()">Clear Feed</button>
         </div>
 
         <!-- Live JSON-RPC Log Feed -->
-        <div class="mcp-log-feed" id="mcpLogFeed" role="log" aria-live="polite">
+        <div class="mcp-log-feed" id="mcpLogFeed" data-testid="mcp-log-feed" role="log" aria-live="polite" tabindex="0" aria-label="Live MCP JSON-RPC protocol message feed">
           <!-- Populated securely via DOM nodes -->
         </div>
 
         <!-- Interactive Judge Tool Execution Form -->
         <form class="tool-execution-form" onsubmit="event.preventDefault(); executeSelectedTool();">
           <label for="judgeToolSelect" style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
-            Execute MCP Tool Directly
+            Execute MCP Tool Directly over Streamable HTTP
           </label>
-          <select id="judgeToolSelect" class="tool-select" onchange="updateToolArgPlaceholder()">
-            <option value="smart_entry_poll_events">smart_entry_poll_events</option>
-            <option value="smart_entry_trigger_scenario">smart_entry_trigger_scenario</option>
-            <option value="bedrock_reason_triage">bedrock_reason_triage</option>
-            <option value="alexa_proactive_dispatch">alexa_proactive_dispatch</option>
-            <option value="household_action_execute">household_action_execute</option>
+          <select id="judgeToolSelect" class="tool-select" onchange="updateToolArgPlaceholder()" data-testid="judge-tool-select">
+            <option value="">Connecting tools...</option>
           </select>
 
-          <input type="text" id="judgeToolArgs" class="tool-args-input" placeholder='{"limit": 2}' aria-label="Tool JSON arguments">
+          <input type="text" id="judgeToolArgs" class="tool-args-input" placeholder='{"limit": 2}' aria-label="Tool JSON arguments" data-testid="judge-tool-args">
 
-          <button type="submit" class="btn btn-secondary btn-sm">
-            Call Tool (JSON-RPC)
+          <button type="submit" class="btn btn-secondary btn-sm" id="btnCallTool" data-testid="judge-tool-call-btn">
+            Send tools/call Request
           </button>
         </form>
       </div>
@@ -221,11 +252,30 @@
 
   </main>
 
-  <!-- Accessible Modal: Friction Log (+10% Bonus) -->
+  <!-- Modal: MCP Verification Checklist -->
+  <div id="mcpVerifyModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="mcpVerifyTitle" tabindex="-1">
+    <div class="modal-dialog">
+      <header class="modal-header">
+        <h3 id="mcpVerifyTitle">MCP Streamable HTTP Transport Verification</h3>
+        <button class="btn-close-modal" onclick="closeMcpVerifyModal()" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-content-area" id="mcpVerifyContentArea">
+        <div id="mcpVerifyChecklist" class="verify-checklist">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+      <footer class="modal-footer">
+        <small style="color: var(--text-muted);">Verified against Model Context Protocol Specification v2025-11-25</small>
+        <button class="btn btn-secondary btn-sm" onclick="closeMcpVerifyModal()">Close</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Accessible Modal: Friction Log -->
   <div id="frictionModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1">
     <div class="modal-dialog">
       <header class="modal-header">
-        <h3 id="modalTitle">Amazon Developer Experience Friction Log (+10% Bonus)</h3>
+        <h3 id="modalTitle">Amazon AppDev Experience Friction Log (+10% Bonus)</h3>
         <button class="btn-close-modal" onclick="closeFrictionModal()" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-content-area" id="frictionContentArea">

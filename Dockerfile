@@ -18,6 +18,9 @@ EXPOSE 8000
 
 ENV HOST=0.0.0.0
 ENV PORT=8000
-ENV USE_BEDROCK_MOCK=true
+ENV FORCE_BEDROCK_SIMULATOR=false
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
 
 CMD ["uvicorn", "backend.server:app", "--host", "0.0.0.0", "--port", "8000"]

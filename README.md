@@ -5,7 +5,8 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg)](https://fastapi.tiangolo.com/)
 [![MCP Spec](https://img.shields.io/badge/MCP%20Spec-2025--11--25-blueviolet.svg)](https://modelcontextprotocol.io/)
 [![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock%20Claude%203.5-ff9900.svg)](https://aws.amazon.com/bedrock/)
-[![Tests](https://img.shields.io/badge/tests-35%20passed%20(92%25%20cov)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-45%20passed%20(88%25%20cov)-brightgreen.svg)](tests/)
+[![Axe A11y](https://img.shields.io/badge/axe--core-WCAG%202.1%20AA%20Pass-success.svg)](tests/test_browser_e2e.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > Built for **Build, Ship, Shape: Amazon Developer Hackathon 2026**  
@@ -20,8 +21,9 @@
 
 ![AmbientOps Calm Mission Control Console](assets/screenshots/overview.png)
 
-### 🎥 Interactive Video Walkthrough
-An interactive video recording demonstrating real-time incident observation, Bedrock reasoning, operator approval, and Alexa+ speech synthesis is available in [assets/demo/ambient_ops_walkthrough.webp](assets/demo/ambient_ops_walkthrough.webp).
+### 🎥 Public Demo Video Walkthrough
+* **Video Submission Status**: `PUBLIC_DEMO_VIDEO_URL_REQUIRED` (To be recorded and linked by the designated video submission owner).  
+* **Production Script & Shot List**: Fully prepared in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md), featuring exact 2:45 timings, UI action cues, and operator voiceover transcripts.
 
 ---
 
@@ -34,6 +36,21 @@ An interactive video recording demonstrating real-time incident observation, Bed
 | Night Perimeter Anomaly & Smart Lighting | Live MCP Protocol Inspector & Tool Runner |
 | :---: | :---: |
 | ![Night Perimeter Anomaly](assets/screenshots/night_loitering.png) | ![Live MCP Protocol Inspector](assets/screenshots/mcp_tool_execution.png) |
+
+---
+
+## 📋 Implementation & Evidence Status
+
+| Component / Capability | Implementation Source | Test & Verification Evidence | Verification Status |
+| :--- | :--- | :--- | :--- |
+| **Streamable HTTP MCP Transport** (Spec v2025-11-25) | [`backend/mcp_server.py`](backend/mcp_server.py), [`backend/server.py`](backend/server.py) | [`tests/test_mcp_interop.py`](tests/test_mcp_interop.py), [`tests/test_mcp_server.py`](tests/test_mcp_server.py) | **VERIFIED** (Official `mcp==2.3.0` SDK client session, 202 bodyless notifs, Mcp-Session-Id header) |
+| **Human Operator Approval Gate** | [`backend/server.py`](backend/server.py), [`frontend/app.js`](frontend/app.js) | [`tests/test_approval_flow.py`](tests/test_approval_flow.py), [`tests/test_browser_e2e.py`](tests/test_browser_e2e.py) | **VERIFIED** (Idempotent 200/409 transitions, strict IncidentStatus enum, allowlisted actions) |
+| **Amazon Bedrock Cognitive Triage** | [`backend/bedrock_agent.py`](backend/bedrock_agent.py) | [`tests/test_bedrock_agent.py`](tests/test_bedrock_agent.py), [`tests/test_bedrock_mocking.py`](tests/test_bedrock_mocking.py) | **VERIFIED** (Converse API model call with deterministic offline simulator fallback) |
+| **Alexa+ Proactive Voice Dispatch** | [`backend/mcp_server.py`](backend/mcp_server.py), [`frontend/app.js`](frontend/app.js) | [`tests/test_mcp_server.py`](tests/test_mcp_server.py), [`tests/test_browser_e2e.py`](tests/test_browser_e2e.py) | **VERIFIED** (`is_simulated: True` MCP tool + browser Web Speech API simulation) |
+| **Smart Entry Event Simulator** | [`backend/smart_entry_simulator.py`](backend/smart_entry_simulator.py) | [`tests/test_ring_simulator.py`](tests/test_ring_simulator.py), [`tests/test_e2e_pipeline.py`](tests/test_e2e_pipeline.py) | **VERIFIED** (5 deterministic sensor scenarios, normalized bounding boxes) |
+| **Calm Mission Control Web Console** | [`frontend/index.html`](frontend/index.html), [`frontend/styles.css`](frontend/styles.css), [`frontend/app.js`](frontend/app.js) | [`tests/test_browser_e2e.py`](tests/test_browser_e2e.py) | **VERIFIED** (Playwright E2E across 320px–1920px viewports, 0 horizontal scroll, 0 Axe a11y violations) |
+| **Security & Privacy Defense** | [`backend/server.py`](backend/server.py), [`backend/config.py`](backend/config.py) | [`tests/test_security_headers.py`](tests/test_security_headers.py) | **VERIFIED** (CSP, X-Frame-Options, DNS rebinding Host validation, PII scrubbing) |
+| **Public Demo Video Walkthrough** | Video submission | `PUBLIC_DEMO_VIDEO_URL_REQUIRED` | **PENDING RECORDING** (To be recorded and linked by submission owner) |
 
 ---
 
@@ -84,7 +101,7 @@ graph TD
         INGEST --> EVID
 
         subgraph MCP_CORE ["Model Context Protocol (v2025-11-25)"]
-            MCP_ENG["MCP Server Engine<br/>(/mcp & /mcp/sse)"]:::core
+            MCP_ENG["MCP Server Engine<br/>(/mcp Canonical Streamable HTTP)"]:::core
             T_POLL["Tool: smart_entry_poll_events"]:::core
             T_TRIAGE["Tool: bedrock_reason_triage"]:::core
             T_DISPATCH["Tool: alexa_proactive_dispatch"]:::core
@@ -127,7 +144,7 @@ graph TD
 
     subgraph CLIENT_UI ["Calm Mission Control Interface"]
         UI_WORKSPACE["Web Workspace (HTML5 / Vanilla JS)<br/>• Dominant Evidence Canvas<br/>• Operator Approval Boundary Card<br/>• Live MCP Protocol Inspector"]:::core
-        MCP_ENG <-->|Streamable HTTP SSE| UI_WORKSPACE
+        MCP_ENG <-->|Streamable HTTP /mcp| UI_WORKSPACE
         AUDIT --> UI_WORKSPACE
     end
 ```
@@ -149,8 +166,12 @@ Conforming strictly to **MCP v2025-11-25**, AmbientOps provides standard tools, 
 
 ### 2. Registered MCP Resources
 * `ambient://devices/sensors/live`: Real-time telemetry, signal RSSI, and battery levels for the entry sensor fleet.
-* `ambient://household/context`: Resident profiles, quiet-hour schedules, and emergency contacts.
+* `ambient://household/context`: Resident profiles, quiet-hour schedules, and emergency contacts (scrubbed of personal data).
 * `ambient://telemetry/mcp`: Real-time MCP message counters, latencies, and active transports.
+
+### 3. Registered MCP Prompts
+* `triage_incident`: Operational prompt template for incident evaluation with contextual household guidance.
+* `daily_ambient_brief`: Morning ambient summary prompt for home activity status.
 
 ---
 
@@ -186,15 +207,16 @@ Open your browser at **`http://localhost:8000`** to access the Calm Mission Cont
 
 ## 🧪 Automated Test Suite
 
-Run the full automated test suite verifying MCP protocol compliance, Bedrock triage, human operator approval, security headers, and API endpoints:
+Run the full automated test suite verifying MCP protocol compliance, Bedrock triage, human operator approval, security headers, Playwright browser E2E, and Axe accessibility:
 
 ```bash
 pytest --cov=backend --cov-report=term-missing tests/ -v
 ```
 
 **Measured Results**:
-* **35 passing tests** (100% pass rate)
-* **92% measured statement coverage** across all critical backend modules.
+* **45 passing tests** (100% pass rate)
+* **88% measured statement coverage** across all critical backend modules.
+* **0 accessibility violations** verified via automated Axe-core audit across mobile, tablet, and desktop viewports.
 
 ---
 
@@ -211,6 +233,7 @@ Access the application at `http://localhost:8000`.
 
 ## 🔒 Security & Privacy
 * **CORS Allowlist**: Configurable via `CORS_ALLOWED_ORIGINS` (defaults to local loopback). Wildcard credentials (`*`) are disabled.
+* **DNS Rebinding Defense**: Host and Origin header validation enforced via `TransportSecuritySettings`.
 * **Security Headers**: Standard defense-in-depth headers injected on every response (`Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`).
 * **DOM Injection Protection**: All client-side DOM manipulation uses safe node construction without raw `innerHTML` parsing.
 * **No Leaked Credentials**: Uses standard boto3 credential chains; zero keys committed.

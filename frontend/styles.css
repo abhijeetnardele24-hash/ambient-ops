@@ -1,7 +1,8 @@
 /* =====================================================================
    AmbientOps — Calm Mission Control Design System
-   Flat technical-minimal design. Paper/off-white canvas, forest ink,
-   white surfaces, 1px structural borders. No neon, no glow, no glassmorphism.
+   Modern technical mission-control interface.
+   Editorial, operational, paper/off-white canvas, forest ink, 1px borders.
+   No blue page glow, no neon, no glassmorphism, no gradient AI orb.
    ===================================================================== */
 
 :root {
@@ -16,7 +17,7 @@
 
   --text-primary: #0e1f18;      /* Forest ink */
   --text-secondary: #334155;    /* Slate neutral */
-  --text-muted: #64748b;        /* Cool gray */
+  --text-muted: #475569;        /* Slate neutral for WCAG AA >= 4.5:1 */
   --text-inverse: #ffffff;
 
   --forest-primary: #1b4332;
@@ -64,6 +65,12 @@
   padding: 0;
 }
 
+html, body {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
 body {
   background-color: var(--canvas-bg);
   color: var(--text-primary);
@@ -72,6 +79,19 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Screen Reader Utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 /* Focus Visibility for Complete Keyboard Navigation */
@@ -91,17 +111,19 @@ body {
   position: sticky;
   top: 0;
   z-index: 50;
+  gap: 16px;
 }
 
 .brand-section {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 240px;
 }
 
 .brand-mark {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   background-color: var(--forest-dark);
   color: var(--text-inverse);
   font-family: var(--font-mono);
@@ -111,6 +133,7 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
+  flex-shrink: 0;
 }
 
 .brand-title-wrap h1 {
@@ -121,6 +144,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .brand-title-wrap p {
@@ -133,6 +157,14 @@ body {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.header-action-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 /* Explicit Mode Badges (Text + Shape/Icon + Color) */
@@ -140,12 +172,38 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 8px;
+  padding: 4px 8px;
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 600;
   border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.mode-badge.connected,
+.mode-badge.live {
+  background-color: var(--status-success-bg);
+  color: var(--status-success-text);
+  border-color: var(--status-success-border);
+}
+
+.mode-badge.connecting {
+  background-color: var(--status-warning-bg);
+  color: var(--status-warning-text);
+  border-color: var(--status-warning-border);
+}
+
+.mode-badge.disconnected {
+  background-color: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
+  border-color: var(--status-neutral-border);
+}
+
+.mode-badge.error {
+  background-color: var(--status-critical-bg);
+  color: var(--status-critical-text);
+  border-color: var(--status-critical-border);
 }
 
 .mode-badge.simulated {
@@ -154,32 +212,21 @@ body {
   border-color: var(--status-warning-border);
 }
 
-.mode-badge.connected {
-  background-color: var(--status-success-bg);
-  color: var(--status-success-text);
-  border-color: var(--status-success-border);
-}
-
 .mode-badge.mock {
   background-color: var(--status-neutral-bg);
-  color: var(--status-neutral-text);
-  border-color: var(--status-neutral-border);
-}
-
-.mode-badge.live {
-  background-color: #eff6ff;
-  color: #1e40af;
-  border-color: #bfdbfe;
+  color: var(--text-secondary);
+  border-color: var(--border-structural);
 }
 
 /* Three-Column Mission Control Grid */
 .mission-grid {
   display: grid;
-  grid-template-columns: 280px minmax(500px, 1.8fr) 360px;
+  grid-template-columns: 290px minmax(460px, 1.8fr) 380px;
   gap: 16px;
   padding: 16px 24px;
   max-width: 1720px;
   margin: 0 auto;
+  width: 100%;
 }
 
 /* Common Card & Panel Architecture */
@@ -232,8 +279,9 @@ body {
   transition: border-color 0.15s ease, background-color 0.15s ease;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   color: inherit;
+  min-height: 48px;
 }
 
 .scenario-card-btn:hover {
@@ -247,17 +295,39 @@ body {
   background-color: #fdfefe;
 }
 
+/* Fix spacing & text collision in scenario button titles */
 .sc-title {
   font-weight: 600;
   font-size: 0.84rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.sc-name {
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.sc-tag {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--forest-primary);
+  background-color: var(--surface-subtle);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-structural);
+  white-space: nowrap;
 }
 
 .sc-desc {
   font-size: 0.73rem;
   color: var(--text-muted);
+  line-height: 1.35;
 }
 
 .device-catalog-list {
@@ -325,6 +395,8 @@ body {
   justify-content: space-between;
   font-size: 0.76rem;
   font-family: var(--font-mono);
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .telemetry-item strong {
@@ -348,6 +420,8 @@ body {
   justify-content: space-between;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border-structural);
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .gate-title {
@@ -363,7 +437,7 @@ body {
 .gate-badge {
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: var(--radius-sm);
   font-weight: 700;
 }
@@ -420,18 +494,21 @@ body {
   padding-top: 10px;
   border-top: 1px solid var(--border-structural);
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .btn-group {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 7px 14px;
+  padding: 8px 16px;
   border-radius: var(--radius-sm);
   font-size: 0.82rem;
   font-weight: 600;
@@ -439,13 +516,15 @@ body {
   border: 1px solid transparent;
   transition: background-color 0.15s ease, border-color 0.15s ease;
   font-family: var(--font-display);
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .btn-primary {
   background-color: var(--forest-primary);
   color: var(--text-inverse);
 }
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background-color: var(--forest-dark);
 }
 
@@ -454,7 +533,7 @@ body {
   border-color: var(--border-strong);
   color: var(--text-primary);
 }
-.btn-secondary:hover {
+.btn-secondary:hover:not(:disabled) {
   background-color: var(--surface-subtle);
 }
 
@@ -463,11 +542,25 @@ body {
   border-color: var(--status-critical-border);
   color: var(--status-critical-text);
 }
-.btn-danger:hover {
+.btn-danger:hover:not(:disabled) {
   background-color: var(--status-critical-bg);
 }
 
-.btn-sm { padding: 4px 10px; font-size: 0.74rem; }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  min-height: 36px;
+}
+
+.verified-outcome-block {
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-structural);
+}
 
 /* Spoken Alexa+ Voice Box */
 .alexa-voice-card {
@@ -482,6 +575,8 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .voice-title {
@@ -506,11 +601,28 @@ body {
   flex-direction: column;
 }
 
+.inspector-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.session-id-display {
+  font-family: var(--font-mono);
+  color: var(--forest-primary);
+  font-size: 0.7rem;
+  word-break: break-all;
+}
+
 .mcp-log-feed {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 520px;
+  max-height: 480px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -530,6 +642,8 @@ body {
   margin-bottom: 4px;
   color: var(--text-muted);
   font-size: 0.65rem;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .mcp-dir-tag {
@@ -537,8 +651,11 @@ body {
   padding: 1px 4px;
   border-radius: 2px;
 }
-.mcp-dir-tag.inbound { background: #dbeafe; color: #1e40af; }
-.mcp-dir-tag.outbound { background: #d1fae5; color: #065f46; }
+.mcp-dir-tag.request,
+.mcp-dir-tag.client_request { background: #dbeafe; color: #1e40af; }
+.mcp-dir-tag.response,
+.mcp-dir-tag.server_response { background: #d1fae5; color: #065f46; }
+.mcp-dir-tag.notification { background: #ede9fe; color: #5b21b6; }
 .mcp-dir-tag.internal { background: #fef3c7; color: #92400e; }
 
 .mcp-code-view {
@@ -548,8 +665,9 @@ body {
   padding: 6px;
   overflow-x: auto;
   color: #1e293b;
-  max-height: 120px;
+  max-height: 140px;
   white-space: pre-wrap;
+  word-break: break-all;
 }
 
 /* Interactive Tool Execution Form */
@@ -559,18 +677,19 @@ body {
   border-top: 1px solid var(--border-structural);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .tool-select, .tool-args-input {
   width: 100%;
-  padding: 6px 8px;
+  padding: 8px 10px;
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: 0.76rem;
   border: 1px solid var(--border-structural);
   border-radius: var(--radius-sm);
   background-color: var(--surface-bg);
   color: var(--text-primary);
+  min-height: 44px;
 }
 
 /* Modal Accessibility & Styling */
@@ -595,7 +714,6 @@ body {
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
 }
 
 .modal-header {
@@ -604,18 +722,28 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .modal-header h3 { font-size: 1rem; font-weight: 700; }
 
 .btn-close-modal {
   background: transparent;
-  border: none;
-  font-size: 1.3rem;
+  border: 1px solid transparent;
+  font-size: 1.4rem;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 4px 8px;
   border-radius: var(--radius-sm);
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-close-modal:hover {
+  background-color: var(--surface-subtle);
+  color: var(--text-primary);
 }
 
 .modal-content-area {
@@ -642,19 +770,63 @@ body {
   justify-content: space-between;
   align-items: center;
   background-color: var(--surface-subtle);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* MCP Verification Checklist */
+.verify-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.verify-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-structural);
+  background-color: var(--surface-bg);
+  font-size: 0.84rem;
+}
+
+.verify-row.pass {
+  border-color: var(--status-success-border);
+  background-color: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.verify-row.fail {
+  border-color: var(--status-critical-border);
+  background-color: var(--status-critical-bg);
+  color: var(--status-critical-text);
+}
+
+.verify-row.pending {
+  border-color: var(--status-warning-border);
+  background-color: var(--status-warning-bg);
+  color: var(--status-warning-text);
+}
+
+.verify-badge {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.76rem;
 }
 
 /* Responsive Breakpoints */
 @media (max-width: 1200px) {
   .mission-grid {
-    grid-template-columns: 240px 1fr;
+    grid-template-columns: 260px 1fr;
   }
   .protocol-inspector {
     grid-column: 1 / -1;
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 820px) {
   .mission-grid {
     grid-template-columns: 1fr;
     padding: 12px;
@@ -662,10 +834,36 @@ body {
   .top-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 10px;
     padding: 10px 14px;
+  }
+  .system-status-ribbon {
+    justify-content: flex-start;
   }
   .evidence-rationale-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Ultra-compact Mobile (320px - 360px): No horizontal overflow */
+@media (max-width: 380px) {
+  .mission-grid {
+    padding: 6px;
+    gap: 12px;
+  }
+  .top-header {
+    padding: 8px;
+  }
+  .panel-body, .approval-boundary-card {
+    padding: 10px;
+  }
+  .btn {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+  .sc-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
   }
 }

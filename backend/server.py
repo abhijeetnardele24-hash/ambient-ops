@@ -1,10 +1,14 @@
 """AmbientOps FastAPI Backend & Streamable HTTP MCP Server.
-Provides incident analysis, explicit operator approval gate, and MCP protocol transport.
+Provides incident analysis, explicit operator approval gate, and Streamable HTTP MCP transport.
+Conforms to MCP specification v2025-11-25.
 """
 
 import asyncio
+from contextlib import asynccontextmanager
+from enum import Enum
 import json
 import logging
+import re
 import time
 import uuid
 from pathlib import Path
@@ -17,43 +21,95 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .config import settings
-from .mcp_server import mcp_server
+from .mcp_server import (
+    ALLOWED_SIMULATED_ACTIONS,
+    mcp_server,
+    sdk_mcp_server,
+)
 from .smart_entry_simulator import smart_entry_simulator
 from .bedrock_agent import bedrock_agent
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("ambient_ops.server")
 
-app = FastAPI(
-    title=settings.app_name,
-    description="Autonomous Multi-Device MCP Incident Response Console for Alexa+ and Smart Sensors",
-    version=settings.version,
+BASE_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = BASE_DIR / "frontend"
+
+# Build official MCP Streamable HTTP transport app
+sec_settings = mcp_server.create_transport_security()
+sdk_mcp_app = sdk_mcp_server.streamable_http_app(
+    streamable_http_path="/mcp",
+    transport_security=sec_settings,
+    json_response=False,
 )
 
-# CORS Middleware with explicit origins
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manages the application lifecycle, including MCP session manager task group."""
+    logger.info("Starting AmbientOps server lifecycle...")
+    sm = getattr(sdk_mcp_server._lowlevel_server, "_session_manager", None)
+    if sm and getattr(sm, "_has_started", False):
+        sm._has_started = False
+
+    try:
+        async with sdk_mcp_app.router.lifespan_context(sdk_mcp_app):
+            yield
+    finally:
+        if sm:
+            sm._has_started = False
+        logger.info("Shutting down AmbientOps server lifecycle...")
+
+
+app = FastAPI(
+    title=settings.app_name,
+    description="Multi-Device Incident Response Console for Alexa+ and Smart Sensors via Model Context Protocol",
+    version=settings.version,
+    lifespan=lifespan,
+)
+
+# CORS Middleware with explicit origins and exposed session header
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["Mcp-Session-Id", "X-Request-ID", "Content-Type", "Deprecation"],
 )
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = BASE_DIR / "frontend"
+
+# --- Security Headers, Tracing & Host Validation Middleware ---
+SAFE_REQ_ID_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,36}$")
 
 
-# --- Security Headers & Request ID Middleware ---
 @app.middleware("http")
 async def security_and_tracing_middleware(request: Request, call_next):
-    req_id = request.headers.get("X-Request-ID", f"req_{uuid.uuid4().hex[:12]}")
+    # Sanitize and assign request ID
+    raw_req_id = request.headers.get("X-Request-ID", "")
+    if raw_req_id and SAFE_REQ_ID_RE.match(raw_req_id):
+        req_id = raw_req_id
+    else:
+        req_id = f"req_{uuid.uuid4().hex[:12]}"
     request.state.request_id = req_id
-    t0 = time.perf_counter()
 
+    # DNS Rebinding Protection: Host header validation for MCP and API endpoints
+    host_header = request.headers.get("Host", "").split(":")[0].lower()
+    if host_header:
+        allowed_base_hosts = {h.split(":")[0].lower() for h in settings.allowed_hosts}
+        if host_header not in allowed_base_hosts and "*" not in settings.allowed_hosts:
+            logger.warning("Rejected request with invalid Host header: '%s'", host_header)
+            return Response(
+                content=json.dumps({"detail": "Invalid Host header; rejected by DNS rebinding defense."}),
+                status_code=421,
+                media_type="application/json",
+            )
+
+    t0 = time.perf_counter()
     try:
         response: Response = await call_next(request)
     except Exception as e:
-        logger.error("Unhandled server exception [%s]: %s", req_id, str(e), exc_info=True)
+        logger.error("Unhandled server exception [%s]: %s", req_id, type(e).__name__, exc_info=True)
         response = Response(
             content=json.dumps({"detail": "An internal server error occurred.", "request_id": req_id}),
             status_code=500,
@@ -71,26 +127,41 @@ async def security_and_tracing_middleware(request: Request, call_next):
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data:; "
-        "connect-src 'self';"
+        "connect-src 'self' http://localhost:* http://127.0.0.1:*;"
     )
 
     logger.info("%s %s [%s] -> %d (%sms)", request.method, request.url.path, req_id, response.status_code, duration)
     return response
 
 
-# --- In-Memory Incident State Store ---
+# Mount official MCP Streamable HTTP routes (/mcp for POST, GET, DELETE)
+for route in sdk_mcp_app.routes:
+    app.routes.append(route)
+
+
+# --- Strict Incident Status Enum & In-Memory Audit Ledger ---
+class IncidentStatus(str, Enum):
+    PENDING_OPERATOR_APPROVAL = "PENDING_OPERATOR_APPROVAL"
+    SIMULATION_APPROVED = "SIMULATION_APPROVED"
+    OPERATOR_REJECTED = "OPERATOR_REJECTED"
+
+
 class IncidentRecord(BaseModel):
     incident_id: str = Field(default_factory=lambda: f"inc_{uuid.uuid4().hex[:10]}")
     created_at: float = Field(default_factory=time.time)
     event: Dict[str, Any]
     triage_decision: Dict[str, Any]
-    status: str = "PENDING_OPERATOR_APPROVAL"  # PENDING_OPERATOR_APPROVAL, SIMULATION_APPROVED, OPERATOR_REJECTED
-    operator_notes: Optional[str] = None
+    status: IncidentStatus = IncidentStatus.PENDING_OPERATOR_APPROVAL
+    operator_notes: Optional[str] = Field(default=None, max_length=500)
     executed_actions: List[str] = Field(default_factory=list)
     outcome_verified: bool = False
     verified_at: Optional[float] = None
+    approved_by: Optional[str] = None
+    approved_at: Optional[float] = None
+    audit_id: str = Field(default_factory=lambda: f"audit_{uuid.uuid4().hex[:12]}")
 
 
+# In-memory incident ledger (auditable session record, not claimed to be an immutable blockchain)
 active_incidents: Dict[str, IncidentRecord] = {}
 
 
@@ -103,6 +174,7 @@ def health_check():
         "app": settings.app_name,
         "version": settings.version,
         "mcp_protocol_version": settings.mcp_protocol_version,
+        "mcp_transport": "Streamable HTTP (MCP v2025-11-25)",
         "provider_mode": bedrock_status["provider_mode"],
         "is_simulated_devices": True,
         "bedrock": bedrock_status,
@@ -120,31 +192,26 @@ def runtime_telemetry():
             "tools_registered": len(mcp_server._tools),
             "resources_registered": len(mcp_server._resources),
             "protocol_version": settings.mcp_protocol_version,
+            "transport": "Streamable HTTP (canonical endpoint: /mcp)",
         },
     }
 
 
-# --- Model Context Protocol (MCP) Endpoints ---
-@app.post("/mcp")
-async def mcp_jsonrpc_endpoint(request: Request):
-    """Standard MCP JSON-RPC 2.0 HTTP transport endpoint."""
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON payload.")
+# --- Deprecated Legacy SSE Transport (Compatibility Only) ---
+@app.get("/mcp/sse", deprecated=True)
+async def deprecated_mcp_sse_endpoint():
+    """Explicitly deprecated legacy standalone SSE route.
+    Provided for backwards compatibility only.
+    Canonical Streamable HTTP transport is served at '/mcp'.
+    """
+    logger.warning("Client requested deprecated legacy route /mcp/sse. Redirecting conceptually to Streamable HTTP /mcp.")
 
-    response = mcp_server.handle_request(body)
-    return response
-
-
-@app.get("/mcp/sse")
-async def mcp_sse_endpoint():
-    """Streamable HTTP / Server-Sent Events (SSE) MCP Transport."""
     async def event_generator():
         init_event = {
             "type": "endpoint",
             "endpoint": "/mcp",
             "protocolVersion": settings.mcp_protocol_version,
+            "notice": "DEPRECATED_TRANSPORT: Migrate to canonical Streamable HTTP at /mcp",
         }
         yield f"event: endpoint\ndata: {json.dumps(init_event)}\n\n"
 
@@ -157,18 +224,22 @@ async def mcp_sse_endpoint():
             }
             yield f"event: ping\ndata: {json.dumps(ping_data)}\n\n"
 
-    return StreamingResponse(
+    response = StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "Deprecation": "true",
+            "Link": '</mcp>; rel="successor-version"',
+            "Warning": '299 - "Deprecated legacy transport. Use Streamable HTTP at /mcp."',
         },
     )
+    return response
 
 
-# --- Smart Entry & Ring Compatibility APIs ---
+# --- Smart Entry Simulator APIs ---
 @app.get("/api/scenarios")
 @app.get("/api/ring/scenarios")
 def list_scenarios():
@@ -201,8 +272,9 @@ def get_devices():
 # --- Incident Operator Sequence & Human Approval Gate ---
 @app.post("/api/agent/analyze/{event_id}")
 async def analyze_event(event_id: str, request: Request):
-    """Sequence Step 2-3: Observe evidence & Analyze via MCP Bedrock tool.
-    Transitions to PENDING_OPERATOR_APPROVAL.
+    """Sequence Step 2-3: Observe evidence & Analyze via Bedrock tool.
+    Creates incident record strictly at PENDING_OPERATOR_APPROVAL.
+    Never executes simulated remediations without explicit operator approval.
     """
     event = smart_entry_simulator.get_event_by_id(event_id)
     if not event:
@@ -210,7 +282,6 @@ async def analyze_event(event_id: str, request: Request):
 
     req_id = getattr(request.state, "request_id", None)
 
-    # Invoke Bedrock Triage through MCP logging
     decision = bedrock_agent.triage_ambient_event(
         event_summary=event.summary,
         device_name=event.device_name,
@@ -230,7 +301,7 @@ async def analyze_event(event_id: str, request: Request):
     incident = IncidentRecord(
         event=event.model_dump(),
         triage_decision=decision.model_dump(),
-        status="PENDING_OPERATOR_APPROVAL",
+        status=IncidentStatus.PENDING_OPERATOR_APPROVAL,
     )
     active_incidents[incident.incident_id] = incident
 
@@ -242,23 +313,44 @@ async def analyze_event(event_id: str, request: Request):
 
 
 class ApprovalRequest(BaseModel):
-    operator_notes: Optional[str] = "Approved by operator from Calm Mission Control"
+    operator_notes: Optional[str] = Field(
+        default="Approved by operator from Calm Mission Control",
+        max_length=500,
+    )
 
 
 @app.post("/api/operator/approve/{incident_id}")
 async def approve_incident(incident_id: str, payload: ApprovalRequest = ApprovalRequest()):
-    """Sequence Step 5-6: Human Approval Gate -> Execute Simulation -> Verify Outcome."""
+    """Human Approval Gate -> Execute Simulation -> Verify Outcome.
+    Guarded by:
+    - Idempotency checks
+    - Safe conflict resolution if previously rejected
+    - Strict allowlist of permitted simulation actions
+    """
     incident = active_incidents.get(incident_id)
     if not incident:
         raise HTTPException(status_code=404, detail=f"Incident '{incident_id}' not found.")
 
-    if incident.status != "PENDING_OPERATOR_APPROVAL":
-        return {"status": "already_processed", "incident": incident.model_dump()}
+    # Idempotent: already approved
+    if incident.status == IncidentStatus.SIMULATION_APPROVED:
+        return {
+            "status": "already_processed",
+            "message": "Incident was already approved and executed.",
+            "incident": incident.model_dump(),
+        }
 
-    incident.status = "SIMULATION_APPROVED"
+    # Safe failure: cannot approve an incident that was already rejected
+    if incident.status == IncidentStatus.OPERATOR_REJECTED:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot approve an incident that has already been rejected by the operator.",
+        )
+
+    incident.status = IncidentStatus.SIMULATION_APPROVED
     incident.operator_notes = payload.operator_notes
+    incident.approved_by = "operator_console"
+    incident.approved_at = time.time()
 
-    # If spoken alert was recommended, dispatch to Alexa+
     decision = incident.triage_decision
     if decision.get("should_interrupt_user"):
         mcp_server.log_protocol_message(
@@ -276,18 +368,21 @@ async def approve_incident(incident_id: str, payload: ApprovalRequest = Approval
             },
         )
 
-    # Execute simulated remediation actions
+    # Execute simulated remediation actions strictly guarded by ALLOWED_SIMULATED_ACTIONS allowlist
     executed = []
     actions = decision.get("suggested_actions", [])
     for act in actions:
-        mcp_server.log_protocol_message(
-            "internal_agent",
-            {
-                "method": "tools/call",
-                "params": {"name": "household_action_execute", "arguments": {"action_name": act}},
-            },
-        )
-        executed.append(act)
+        if act in ALLOWED_SIMULATED_ACTIONS:
+            mcp_server.log_protocol_message(
+                "internal_agent",
+                {
+                    "method": "tools/call",
+                    "params": {"name": "household_action_execute", "arguments": {"action_name": act}},
+                },
+            )
+            executed.append(act)
+        else:
+            logger.warning("Ignored arbitrary or unlisted action string: '%s'", act)
 
     incident.executed_actions = executed
     incident.outcome_verified = True
@@ -302,12 +397,31 @@ async def approve_incident(incident_id: str, payload: ApprovalRequest = Approval
 
 @app.post("/api/operator/reject/{incident_id}")
 async def reject_incident(incident_id: str):
-    """Operator explicitly dismisses / rejects recommendation."""
+    """Operator explicitly dismisses / rejects recommendation.
+    Guarded by:
+    - Idempotency checks
+    - Safe conflict resolution if previously approved
+    """
     incident = active_incidents.get(incident_id)
     if not incident:
         raise HTTPException(status_code=404, detail=f"Incident '{incident_id}' not found.")
 
-    incident.status = "OPERATOR_REJECTED"
+    # Idempotent: already rejected
+    if incident.status == IncidentStatus.OPERATOR_REJECTED:
+        return {
+            "status": "already_rejected",
+            "message": "Incident was already rejected by operator.",
+            "incident": incident.model_dump(),
+        }
+
+    # Safe failure: cannot reject an incident that was already approved and executed
+    if incident.status == IncidentStatus.SIMULATION_APPROVED:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot reject an incident that has already been approved and executed.",
+        )
+
+    incident.status = IncidentStatus.OPERATOR_REJECTED
     incident.operator_notes = "Dismissed by operator."
     return {"status": "success", "message": "Incident recommendation rejected.", "incident": incident.model_dump()}
 
@@ -317,10 +431,13 @@ def list_incidents():
     return [inc.model_dump() for inc in active_incidents.values()]
 
 
-# --- Legacy Pipeline Support (Auto-Approved for Automated CI Tests) ---
+# --- Triage Pipeline (STOPS AT PENDING_OPERATOR_APPROVAL) ---
 @app.post("/api/agent/triage/{scenario_id}")
-async def run_autonomous_triage(scenario_id: str, request: Request):
-    """Compatibility endpoint executing full sequence for automated test suites."""
+async def run_triage_sequence(scenario_id: str, request: Request):
+    """Runs sensor trigger and Bedrock reasoning analysis.
+    STRICT COMPLIANCE: Stops at PENDING_OPERATOR_APPROVAL.
+    Does NOT auto-execute simulated remediation actions.
+    """
     try:
         event = smart_entry_simulator.trigger_scenario(scenario_id)
         req_id = getattr(request.state, "request_id", None)
@@ -341,24 +458,12 @@ async def run_autonomous_triage(scenario_id: str, request: Request):
             },
         )
 
-        executed_actions = []
-        for act in decision.suggested_actions:
-            mcp_server.log_protocol_message(
-                "internal_agent",
-                {
-                    "method": "tools/call",
-                    "params": {"name": "household_action_execute", "arguments": {"action_name": act}},
-                },
-            )
-            executed_actions.append(act)
-
         incident = IncidentRecord(
             event=event.model_dump(),
             triage_decision=decision.model_dump(),
-            status="SIMULATION_APPROVED",
-            executed_actions=executed_actions,
-            outcome_verified=True,
-            verified_at=time.time(),
+            status=IncidentStatus.PENDING_OPERATOR_APPROVAL,
+            executed_actions=[],
+            outcome_verified=False,
         )
         active_incidents[incident.incident_id] = incident
 
@@ -366,12 +471,14 @@ async def run_autonomous_triage(scenario_id: str, request: Request):
             "status": "success",
             "event": event.model_dump(),
             "decision": decision.model_dump(),
-            "executed_actions": executed_actions,
             "incident_id": incident.incident_id,
+            "incident_status": incident.status.value,
+            "executed_actions": [],
+            "requires_approval": True,
         }
     except Exception as e:
-        logger.error("Triage error: %s", str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Triage error: %s", type(e).__name__, exc_info=True)
+        raise HTTPException(status_code=500, detail="Incident triage analysis encountered an error.")
 
 
 # --- Telemetry & Friction Log ---
