@@ -60,3 +60,21 @@ def test_mcp_history_endpoint():
     assert history_resp.status_code == 200
     history = history_resp.json()
     assert len(history) > 0
+
+
+def test_incidents_and_devices_endpoints():
+    inc_resp = client.get("/api/incidents")
+    assert inc_resp.status_code == 200
+    assert isinstance(inc_resp.json(), list)
+
+    dev_resp = client.get("/api/devices")
+    assert dev_resp.status_code == 200
+    assert len(dev_resp.json()) >= 4
+
+    evt_resp = client.get("/api/events")
+    assert evt_resp.status_code == 200
+    assert isinstance(evt_resp.json(), list)
+
+    root_resp = client.get("/")
+    assert root_resp.status_code in (200, 404)
+

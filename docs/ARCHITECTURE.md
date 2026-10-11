@@ -1,105 +1,100 @@
-# AmbientOps Architecture & Technical Specification
+# AmbientOps Technical Architecture & Specification
 
-## System Overview
-**AmbientOps** is an autonomous multi-device Model Context Protocol (MCP) agent designed for **Alexa+** and **Ring**, powered by **Amazon Bedrock** (Claude 3.5 Sonnet / AgentCore).
+## 1. System Overview
+**AmbientOps** is an ambient incident-response console designed for **Alexa+** and connected smart entry sensors, powered by **Amazon Bedrock** (Claude 3.5 Sonnet / AgentCore).
 
-It continuously observes environmental sensor events and computer vision detections from Ring cameras, performs cognitive risk triage through Amazon Bedrock, and autonomously dispatches proactive vocal notifications to Alexa+ endpoints while executing connected home remediations.
+The primary operator sequence strictly enforces a **human approval boundary**:
+```
+Trigger Simulated Event 
+  → Ingest & Normalize Evidence 
+  → MCP Bedrock Triage 
+  → Review Decision Rationale & Recommendation 
+  → Explicit Human Operator Approval 
+  → Execute Simulated Action 
+  → Verify Observable Outcome
+```
 
 ---
 
-## Architectural Diagram
+## 2. End-to-End Architectural Diagram
 
 ```mermaid
 graph TD
-    subgraph "1. Physical / Simulated Smart Home Devices"
-        R1["Ring Porch Doorbell Pro<br/>(Camera & Rain Sensor)"] -->|Event Webhook / Telemetry| BUS["Ring Event Bus / Playground"]
-        R2["Ring Hallway Cam<br/>(Motion & Inactivity)"] -->|CV Detections| BUS
-        R3["Ring Backyard Floodlight<br/>(Perimeter Sensors)"] -->|Gate & Pet Detection| BUS
-        R4["Ring Driveway Spotlight<br/>(Infrared & Noise)"] -->|Night Movement| BUS
+    classDef sim fill:#fffbeb,stroke:#b45309,stroke-width:1px;
+    classDef core fill:#ffffff,stroke:#0e1f18,stroke-width:2px;
+    classDef gate fill:#fef2f2,stroke:#991b1b,stroke-width:2px;
+    classDef ext fill:#eff6ff,stroke:#1e40af,stroke-width:1px;
+
+    subgraph SIM_BOUNDARY ["Simulation Boundary (Local Device Fleet)"]
+        D1["Doorbell Pro (Simulated)"]:::sim
+        D2["Hallway Motion (Simulated)"]:::sim
+        D3["Perimeter Cam (Simulated)"]:::sim
+        SIM_BUS["Smart Entry Event Simulator<br/>(Deterministic Preset Bus)"]:::sim
+        D1 --> SIM_BUS
+        D2 --> SIM_BUS
+        D3 --> SIM_BUS
     end
 
-    subgraph "2. AmbientOps Core Server (FastAPI / SSE)"
-        BUS -->|Simulated Trigger| SERVER["FastAPI Backend Server"]
+    subgraph TRUST_BOUNDARY ["AmbientOps Core Backend (FastAPI / SSE)"]
+        INGEST["FastAPI Ingestion & Normalizer<br/>(/api/events/trigger)"]:::core
+        SIM_BUS -->|Event Webhook Payload| INGEST
         
-        subgraph "Model Context Protocol (MCP v2025-11-25)"
-            MCP_S["MCP Server Engine"]
-            TOOLS["MCP Tools:<br/>• ring_poll_events<br/>• ring_trigger_scenario<br/>• bedrock_reason_triage<br/>• alexa_proactive_dispatch<br/>• household_action_execute"]
-            RES["MCP Resources:<br/>• ambient://devices/ring/live<br/>• ambient://household/context<br/>• ambient://telemetry/mcp"]
-            PROMPTS["MCP Prompts:<br/>• triage_incident<br/>• daily_ambient_brief"]
+        EVID["Structured Evidence Store<br/>(Bounding Boxes, Lux, Rain %, Audio dB)"]:::core
+        INGEST --> EVID
+
+        subgraph MCP_CORE ["Model Context Protocol (v2025-11-25)"]
+            MCP_ENG["MCP Server Engine<br/>(/mcp & /mcp/sse)"]:::core
+            T_POLL["Tool: smart_entry_poll_events"]:::core
+            T_TRIAGE["Tool: bedrock_reason_triage"]:::core
+            T_DISPATCH["Tool: alexa_proactive_dispatch"]:::core
+            T_ACTION["Tool: household_action_execute"]:::core
+            MCP_ENG --- T_POLL
+            MCP_ENG --- T_TRIAGE
+            MCP_ENG --- T_DISPATCH
+            MCP_ENG --- T_ACTION
         end
-        
-        SERVER <--> MCP_S
+        EVID -->|tools/call| T_TRIAGE
     end
 
-    subgraph "3. Cognitive Engine (AWS Builder Challenge)"
-        MCP_S -->|JSON-RPC tools/call| BEDROCK["Amazon Bedrock<br/>(Claude 3.5 Sonnet Converse API)"]
-        BEDROCK -->|Risk Index 0-100<br/>Severity & Chain-of-Thought<br/>Spoken Prompt Synthesis| MCP_S
+    subgraph CLOUD_BOUNDARY ["External Services (AWS Cloud Boundary)"]
+        BEDROCK["Amazon Bedrock (Converse API)<br/>Model: Claude 3.5 Sonnet"]:::ext
+        EMULATOR["Deterministic Offline Simulator<br/>(Zero-credential fallback)"]:::ext
+        T_TRIAGE -->|boto3 credential chain| BEDROCK
+        T_TRIAGE -.->|offline / local mode| EMULATOR
     end
 
-    subgraph "4. Ambient Action & Voice Actuators"
-        MCP_S -->|alexa_proactive_dispatch| ALEXA["Alexa+ Voice Endpoint<br/>(Spoken Ambient Dialogue)"]
-        MCP_S -->|household_action_execute| HOME["Smart Home Actuators<br/>(Smart Locks, Floodlights, Chimes)"]
+    subgraph OPERATOR_GATE ["Human Operator Gate (Trust Boundary)"]
+        DECISION["Validated Structured Decision<br/>• Risk Index (0-100)<br/>• Confidence Score<br/>• Decision Rationale<br/>• Recommended Action"]:::core
+        BEDROCK --> DECISION
+        EMULATOR --> DECISION
+
+        GATE{"Human Operator Approval Boundary<br/>(/api/operator/approve)"}:::gate
+        DECISION -->|Status: PENDING_APPROVAL| GATE
     end
 
-    subgraph "5. Interactive Real-Time Dashboard"
-        SERVER -->|Streamable HTTP SSE| UI["Web UI Control Center<br/>• Ring Camera Stage & Bounding Boxes<br/>• Alexa+ Waveform Visualizer & Speech<br/>• Live MCP Protocol Inspector"]
+    subgraph OUTCOME_STAGE ["Action Execution & Outcome Verification"]
+        DISPATCH_VOICE["Alexa+ Ambient Voice Dispatch<br/>(Vocal Speech Prompt Synthesis)"]:::core
+        EXEC_ACTION["Simulated Smart Hardware Actuator<br/>(Door Lock, Porch Bench, Spotlight)"]:::sim
+        AUDIT["Incident Audit Ledger<br/>(Outcome Verified & Timestamps)"]:::core
+
+        GATE -->|OPERATOR APPROVES| DISPATCH_VOICE
+        GATE -->|OPERATOR APPROVES| EXEC_ACTION
+        GATE -->|OPERATOR REJECTS| AUDIT
+        DISPATCH_VOICE --> AUDIT
+        EXEC_ACTION --> AUDIT
+    end
+
+    subgraph CLIENT_UI ["Calm Mission Control Interface"]
+        UI_WORKSPACE["Web Workspace (HTML5 / Vanilla JS)<br/>• Dominant Evidence Canvas<br/>• Operator Approval Boundary Card<br/>• Live MCP Protocol Inspector"]:::core
+        MCP_ENG <-->|Streamable HTTP SSE| UI_WORKSPACE
+        AUDIT --> UI_WORKSPACE
     end
 ```
 
 ---
 
-## MCP Tool Schemas
-
-### 1. `ring_poll_events`
-* **Description**: Queries recent motion, doorbell press, and linger events from connected Ring devices.
-* **Input Schema**:
-  ```json
-  {
-    "type": "object",
-    "properties": {
-      "limit": { "type": "integer", "description": "Max events to retrieve (default: 5)" }
-    }
-  }
-  ```
-
-### 2. `bedrock_reason_triage`
-* **Description**: Evaluates an event using Amazon Bedrock to calculate risk scores and formulate conversational speech.
-* **Input Schema**:
-  ```json
-  {
-    "type": "object",
-    "properties": {
-      "event_id": { "type": "string", "description": "Ring event unique identifier" }
-    },
-    "required": ["event_id"]
-  }
-  ```
-
-### 3. `alexa_proactive_dispatch`
-* **Description**: Dispatches synthesized voice audio or notification chime to a target Alexa+ endpoint.
-* **Input Schema**:
-  ```json
-  {
-    "type": "object",
-    "properties": {
-      "spoken_text": { "type": "string" },
-      "urgency": { "type": "string", "enum": ["low", "moderate", "critical"] },
-      "target_room": { "type": "string" }
-    },
-    "required": ["spoken_text", "urgency"]
-  }
-  ```
-
-### 4. `household_action_execute`
-* **Description**: Executes connected smart home hardware automations.
-* **Input Schema**:
-  ```json
-  {
-    "type": "object",
-    "properties": {
-      "action_name": { "type": "string" },
-      "parameters": { "type": "object" }
-    },
-    "required": ["action_name"]
-  }
-  ```
+## 3. Trust Boundaries & Security Architecture
+1. **Simulation vs Production Boundary**: All smart entry cameras and motion detectors run in local simulated mode (`is_simulated = True`). No unverified third-party hardware commands are transmitted to external IoT networks.
+2. **AWS Cloud Boundary**: Communication with Amazon Bedrock occurs over HTTPS via `boto3.client('bedrock-runtime').converse()`. If AWS credentials are not configured in the host environment, the system strictly isolates execution within the deterministic local simulator, guaranteeing zero unexpected cloud bills.
+3. **Human Approval Boundary**: The application explicitly requires an operator confirmation step (`/api/operator/approve/{incident_id}`) before executing simulated remediations (such as unlocking smart locks or triggering floodlights). Automated escalation cannot bypass this boundary.
+4. **Model Context Protocol Boundary**: All external tool execution from an Alexa+ client passes through strict Pydantic input schemas and JSON-RPC 2.0 error validation (-32600, -32601, -32602, -32603).

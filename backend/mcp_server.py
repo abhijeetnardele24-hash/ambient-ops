@@ -1,5 +1,5 @@
 """AmbientOps Model Context Protocol (MCP) Server.
-RFC-compliant implementation of MCP specification v2025-11-25 for Alexa+ and Ring.
+RFC-compliant implementation of MCP specification v2025-11-25 for Alexa+ and Smart Device Telemetry.
 """
 
 import time
@@ -21,7 +21,7 @@ from .mcp_protocol import (
     McpTool,
     ToolInputSchema,
 )
-from .ring_simulator import ring_simulator
+from .smart_entry_simulator import smart_entry_simulator
 from .bedrock_agent import bedrock_agent
 
 
@@ -33,40 +33,58 @@ class McpServer:
         self._tools: Dict[str, McpTool] = {}
         self._resources: Dict[str, McpResource] = {}
         self._prompts: Dict[str, McpPrompt] = {}
+        self.is_initialized: bool = False
         self._register_defaults()
 
     def _register_defaults(self):
-        # Register Tools
+        # 1. smart_entry_poll_events (with legacy ring alias)
+        poll_tool = McpTool(
+            name="smart_entry_poll_events",
+            description="Retrieve recent smart home motion, dwell, and entry sensor events from simulated cameras.",
+            inputSchema=ToolInputSchema(
+                properties={
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of events to fetch (default: 5, max: 20).",
+                    }
+                }
+            ),
+        )
+        self.register_tool(poll_tool)
+        # Register ring_poll_events as alias for backwards compatibility
         self.register_tool(
             McpTool(
                 name="ring_poll_events",
-                description="Retrieve recent smart home motion, linger, and doorbell events from Ring cameras.",
-                inputSchema=ToolInputSchema(
-                    properties={
-                        "limit": {
-                            "type": "integer",
-                            "description": "Maximum number of events to fetch (default: 5).",
-                        }
-                    }
-                ),
+                description="[Compatibility Alias] Retrieve smart home entry sensor events.",
+                inputSchema=poll_tool.inputSchema,
             )
         )
+
+        # 2. smart_entry_trigger_scenario (with legacy ring alias)
+        trigger_tool = McpTool(
+            name="smart_entry_trigger_scenario",
+            description="Simulate an entry camera event scenario (e.g. delivery_weather_risk, elder_immobility_alert, pet_escape_risk).",
+            inputSchema=ToolInputSchema(
+                properties={
+                    "scenario_id": {
+                        "type": "string",
+                        "description": "ID of scenario to trigger.",
+                        "enum": list(smart_entry_simulator.SCENARIOS.keys()),
+                    }
+                },
+                required=["scenario_id"],
+            ),
+        )
+        self.register_tool(trigger_tool)
         self.register_tool(
             McpTool(
                 name="ring_trigger_scenario",
-                description="Simulate a Ring camera event scenario (e.g. delivery_weather_risk, elder_immobility_alert, pet_escape_risk).",
-                inputSchema=ToolInputSchema(
-                    properties={
-                        "scenario_id": {
-                            "type": "string",
-                            "description": "ID of scenario to trigger.",
-                            "enum": list(ring_simulator.SCENARIOS.keys()),
-                        }
-                    },
-                    required=["scenario_id"],
-                ),
+                description="[Compatibility Alias] Simulate a smart camera event scenario.",
+                inputSchema=trigger_tool.inputSchema,
             )
         )
+
+        # 3. bedrock_reason_triage
         self.register_tool(
             McpTool(
                 name="bedrock_reason_triage",
@@ -75,13 +93,15 @@ class McpServer:
                     properties={
                         "event_id": {
                             "type": "string",
-                            "description": "ID of the Ring event to evaluate.",
+                            "description": "ID of the entry event to evaluate.",
                         }
                     },
                     required=["event_id"],
                 ),
             )
         )
+
+        # 4. alexa_proactive_dispatch
         self.register_tool(
             McpTool(
                 name="alexa_proactive_dispatch",
@@ -105,15 +125,17 @@ class McpServer:
                 ),
             )
         )
+
+        # 5. household_action_execute
         self.register_tool(
             McpTool(
                 name="household_action_execute",
-                description="Execute an automated smart home remediation action (e.g. unlock_porch, turn_on_lights, sound_chime).",
+                description="Execute a verified smart home remediation simulation after human approval.",
                 inputSchema=ToolInputSchema(
                     properties={
                         "action_name": {
                             "type": "string",
-                            "description": "Name of action to execute.",
+                            "description": "Name of remediation action to execute.",
                         },
                         "parameters": {
                             "type": "object",
@@ -128,9 +150,16 @@ class McpServer:
         # Register Resources
         self.register_resource(
             McpResource(
+                uri="ambient://devices/sensors/live",
+                name="Smart Entry Sensor Fleet",
+                description="Live status, battery, and signal telemetry of simulated entry cameras and motion sensors.",
+            )
+        )
+        self.register_resource(
+            McpResource(
                 uri="ambient://devices/ring/live",
-                name="Ring Device Network",
-                description="Live status, battery, and signal telemetry of connected Ring video cameras.",
+                name="[Alias] Smart Entry Sensor Fleet",
+                description="Compatibility alias for connected simulated cameras.",
             )
         )
         self.register_resource(
@@ -173,7 +202,7 @@ class McpServer:
 
     def log_protocol_message(
         self,
-        direction: str,  # inbound / outbound
+        direction: str,
         payload: Dict[str, Any],
         latency_ms: Optional[float] = None,
     ):
@@ -187,20 +216,31 @@ class McpServer:
         if len(self.protocol_history) > 100:
             self.protocol_history = self.protocol_history[:100]
 
-    def handle_request(self, raw_req: Dict[str, Any]) -> Dict[str, Any]:
+    def handle_request(self, raw_req: Any) -> Dict[str, Any]:
         """Dispatches an incoming JSON-RPC 2.0 MCP request."""
-        t0 = time.time()
-        self.log_protocol_message("inbound", raw_req)
+        t0 = time.perf_counter()
+        self.log_protocol_message("inbound", raw_req if isinstance(raw_req, dict) else {"raw": str(raw_req)})
+
+        if not isinstance(raw_req, dict):
+            res = JsonRpcResponse(
+                id=None,
+                error=JsonRpcError(code=PARSE_ERROR, message="Invalid JSON format: payload must be a JSON object."),
+            )
+            out = res.model_dump(exclude_none=True)
+            self.log_protocol_message("outbound", out, round((time.perf_counter() - t0) * 1000, 2))
+            return out
+
+        req_id = raw_req.get("id")
 
         try:
             req = JsonRpcRequest(**raw_req)
         except ValidationError as e:
             res = JsonRpcResponse(
-                id=raw_req.get("id"),
-                error=JsonRpcError(code=INVALID_REQUEST, message=f"Invalid JSON-RPC request: {str(e)}"),
+                id=req_id,
+                error=JsonRpcError(code=INVALID_REQUEST, message=f"Invalid JSON-RPC 2.0 request: {str(e)}"),
             )
             out = res.model_dump(exclude_none=True)
-            self.log_protocol_message("outbound", out, round((time.time() - t0) * 1000, 2))
+            self.log_protocol_message("outbound", out, round((time.perf_counter() - t0) * 1000, 2))
             return out
 
         method = req.method
@@ -208,8 +248,10 @@ class McpServer:
 
         try:
             if method == "initialize":
+                self.is_initialized = True
                 result = InitializeResult().model_dump()
             elif method == "notifications/initialized":
+                self.is_initialized = True
                 result = {"status": "ok", "initialized": True}
             elif method == "ping":
                 result = {}
@@ -233,52 +275,63 @@ class McpServer:
                 result = self._get_prompt(params)
             else:
                 response = JsonRpcResponse(
-                    id=req.id,
-                    error=JsonRpcError(code=METHOD_NOT_FOUND, message=f"Method not found: {method}"),
+                    id=req_id,
+                    error=JsonRpcError(code=METHOD_NOT_FOUND, message=f"Method not found: '{method}'"),
                 )
                 out = response.model_dump(exclude_none=True)
-                self.log_protocol_message("outbound", out, round((time.time() - t0) * 1000, 2))
+                self.log_protocol_message("outbound", out, round((time.perf_counter() - t0) * 1000, 2))
                 return out
 
-            response = JsonRpcResponse(id=req.id, result=result)
+            response = JsonRpcResponse(id=req_id, result=result)
+        except ValueError as val_err:
+            response = JsonRpcResponse(
+                id=req_id,
+                error=JsonRpcError(code=INVALID_PARAMS, message=str(val_err)),
+            )
         except Exception as ex:
             response = JsonRpcResponse(
-                id=req.id,
+                id=req_id,
                 error=JsonRpcError(code=INTERNAL_ERROR, message=f"Internal MCP server error: {str(ex)}"),
             )
 
         out = response.model_dump(exclude_none=True)
-        self.log_protocol_message("outbound", out, round((time.time() - t0) * 1000, 2))
+        self.log_protocol_message("outbound", out, round((time.perf_counter() - t0) * 1000, 2))
         return out
 
     def _execute_tool_call(self, params: Dict[str, Any]) -> Dict[str, Any]:
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
 
-        if not tool_name or tool_name not in self._tools:
+        if not tool_name:
+            raise ValueError("Missing required parameter: 'name'.")
+        if tool_name not in self._tools:
             raise ValueError(f"Tool '{tool_name}' is not registered.")
 
-        if tool_name == "ring_poll_events":
+        if tool_name in ("smart_entry_poll_events", "ring_poll_events"):
             limit = int(arguments.get("limit", 5))
-            events = ring_simulator.get_latest_events(limit)
+            if limit < 1 or limit > 20:
+                raise ValueError("Parameter 'limit' must be between 1 and 20.")
+            events = smart_entry_simulator.get_latest_events(limit)
             return {
                 "content": [
                     {
                         "type": "text",
-                        "text": f"Retrieved {len(events)} Ring events.",
+                        "text": f"Retrieved {len(events)} smart entry events (Simulated).",
                         "data": [e.model_dump() for e in events],
                     }
                 ]
             }
 
-        elif tool_name == "ring_trigger_scenario":
+        elif tool_name in ("smart_entry_trigger_scenario", "ring_trigger_scenario"):
             scenario_id = arguments.get("scenario_id")
-            event = ring_simulator.trigger_scenario(scenario_id)
+            if not scenario_id:
+                raise ValueError("Missing required argument: 'scenario_id'.")
+            event = smart_entry_simulator.trigger_scenario(scenario_id)
             return {
                 "content": [
                     {
                         "type": "text",
-                        "text": f"Triggered Ring scenario: {event.summary}",
+                        "text": f"Triggered smart entry scenario: {event.summary}",
                         "event": event.model_dump(),
                     }
                 ]
@@ -286,14 +339,16 @@ class McpServer:
 
         elif tool_name == "bedrock_reason_triage":
             event_id = arguments.get("event_id")
-            event = ring_simulator.get_event_by_id(event_id)
+            if not event_id:
+                raise ValueError("Missing required argument: 'event_id'.")
+
+            event = smart_entry_simulator.get_event_by_id(event_id)
             if not event:
-                # If not found, use latest
-                latest = ring_simulator.get_latest_events(1)
+                latest = smart_entry_simulator.get_latest_events(1)
                 event = latest[0] if latest else None
 
             if not event:
-                raise ValueError("No Ring event found to analyze.")
+                raise ValueError("No entry event found to analyze.")
 
             decision = bedrock_agent.triage_ambient_event(
                 event_summary=event.summary,
@@ -305,7 +360,7 @@ class McpServer:
                 "content": [
                     {
                         "type": "text",
-                        "text": f"Bedrock triage complete (Risk {decision.risk_score}/100, Severity: {decision.severity}).",
+                        "text": f"Bedrock triage complete (Risk {decision.risk_score}/100, Severity: {decision.severity}, Mode: {decision.provider_mode}).",
                         "decision": decision.model_dump(),
                     }
                 ]
@@ -314,7 +369,13 @@ class McpServer:
         elif tool_name == "alexa_proactive_dispatch":
             spoken_text = arguments.get("spoken_text")
             urgency = arguments.get("urgency", "moderate")
-            target_room = arguments.get("target_room", "Living Room")
+            target_room = arguments.get("target_room", "Living Room Alexa+ Station")
+
+            if not spoken_text:
+                raise ValueError("Missing required argument: 'spoken_text'.")
+            if urgency not in ("low", "moderate", "critical"):
+                raise ValueError("Parameter 'urgency' must be 'low', 'moderate', or 'critical'.")
+
             return {
                 "content": [
                     {
@@ -332,12 +393,16 @@ class McpServer:
 
         elif tool_name == "household_action_execute":
             action_name = arguments.get("action_name")
+            if not action_name:
+                raise ValueError("Missing required argument: 'action_name'.")
+
             return {
                 "content": [
                     {
                         "type": "text",
-                        "text": f"Executed household automation action: {action_name}",
+                        "text": f"Executed household automation simulation: {action_name}",
                         "status": "success",
+                        "is_simulated": True,
                         "executed_at": time.time(),
                     }
                 ]
@@ -347,13 +412,16 @@ class McpServer:
 
     def _read_resource(self, params: Dict[str, Any]) -> Dict[str, Any]:
         uri = params.get("uri")
-        if uri == "ambient://devices/ring/live":
+        if not uri:
+            raise ValueError("Missing required parameter: 'uri'.")
+
+        if uri in ("ambient://devices/sensors/live", "ambient://devices/ring/live"):
             return {
                 "contents": [
                     {
                         "uri": uri,
                         "mimeType": "application/json",
-                        "text": str(ring_simulator.get_device_catalog()),
+                        "text": str(smart_entry_simulator.get_device_catalog()),
                     }
                 ]
             }
@@ -386,7 +454,8 @@ class McpServer:
                                 "total_messages": len(self.protocol_history),
                                 "registered_tools": len(self._tools),
                                 "active_transport": "Streamable HTTP/SSE",
-                                "uptime_sec": 3600,
+                                "protocol_version": "2025-11-25",
+                                "is_initialized": self.is_initialized,
                             }
                         ),
                     }
@@ -396,6 +465,9 @@ class McpServer:
 
     def _get_prompt(self, params: Dict[str, Any]) -> Dict[str, Any]:
         name = params.get("name")
+        if not name:
+            raise ValueError("Missing required parameter: 'name'.")
+
         if name == "triage_incident":
             return {
                 "description": "Standard Bedrock smart home incident evaluation prompt",
@@ -404,7 +476,7 @@ class McpServer:
                         "role": "user",
                         "content": {
                             "type": "text",
-                            "text": "Analyze the following Ring event detections and determine whether to interrupt the resident via Alexa+.",
+                            "text": "Analyze the following smart device sensor detections and determine whether to interrupt the resident via Alexa+.",
                         },
                     }
                 ],
@@ -417,7 +489,7 @@ class McpServer:
                         "role": "user",
                         "content": {
                             "type": "text",
-                            "text": "Summarize all Ring security and motion events from 11 PM to 7 AM into a 30-second Alexa+ verbal briefing.",
+                            "text": "Summarize all smart entry security and motion events from 11 PM to 7 AM into a 30-second Alexa+ verbal briefing.",
                         },
                     }
                 ],
@@ -425,5 +497,4 @@ class McpServer:
         raise ValueError(f"Prompt '{name}' not found.")
 
 
-# Singleton instance
 mcp_server = McpServer()

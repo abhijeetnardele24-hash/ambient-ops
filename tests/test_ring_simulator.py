@@ -9,15 +9,16 @@ def test_ring_simulator_catalog():
     devices = sim.get_device_catalog()
     assert len(devices) >= 4
     device_types = [d["type"] for d in devices]
-    assert "doorbell" in device_types
-    assert "indoor_camera" in device_types
+    assert any("doorbell" in dt for dt in device_types)
+    assert any("sensor" in dt or "indoor" in dt for dt in device_types)
 
 
 def test_ring_simulator_trigger_scenario():
     sim = RingSimulator()
     event = sim.trigger_scenario("elder_immobility_alert")
     assert event.scenario_id == "elder_immobility_alert"
-    assert event.device_id == "ring_indoor_hallway_02"
+    assert "hallway" in event.device_id
+    assert event.is_simulated is True
     assert len(event.detections) > 0
     box = event.detections[0]
     assert box.label == "person_stationary"
