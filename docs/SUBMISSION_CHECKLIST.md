@@ -22,17 +22,17 @@
 - [x] **Docker Deployment**: `Dockerfile` and `docker-compose.yml` included.
 - [x] **3-Minute Video Script**: Detailed shot list, timings, and voiceover prepared in `docs/DEMO_SCRIPT.md`.
 - [x] **Devpost Draft Copy**: Complete text ready in `docs/DEVPOST_SUBMISSION.md`.
-- [ ] **Public Demo Walkthrough Video**: `PUBLIC_DEMO_VIDEO_URL_REQUIRED` (Must be under 3 minutes, in English, uploaded publicly to YouTube or Vimeo, contain no copyrighted music/unlicensed footage, visibly demonstrate MCP initialize, tools/list, and tools/call flow, and visibly show whether Bedrock is LIVE or SIMULATED).
+- [x] **Public Demo Walkthrough Video**: `https://youtu.be/0qtmY3y9X4g` (Public, 2:47, English narration, no copyrighted music/unlicensed footage, visibly demonstrates MCP `initialize`, `tools/list`, and `tools/call`, and identifies Bedrock as **SIMULATED** in the recorded run).
 
 ---
 
 ## 2. Final Owner Actions Before Hitting "Submit" on Devpost
 
-1. [ ] **Video Recording**: Record a walkthrough under 3 minutes in English following `docs/DEMO_SCRIPT.md`. Ensure:
+1. [x] **Video Recording**: The 2:47 English walkthrough is public at `https://youtu.be/0qtmY3y9X4g` and follows `docs/DEMO_SCRIPT.md`. Verified:
    - Uploaded publicly to YouTube or Vimeo (no private videos).
    - Zero copyrighted background music or unlicensed third-party footage.
    - Shows the working MCP flow (`initialize`, `tools/list`, and `tools/call`).
    - Visibly shows whether Bedrock is in **LIVE** or **SIMULATED** mode (narrator must match visible badge).
-   - Paste the public video link into Devpost replacing `PUBLIC_DEMO_VIDEO_URL_REQUIRED`.
+   - Public video link is ready for the Devpost form.
 2. [ ] **Devpost Form Filling**: Copy fields from `docs/DEVPOST_SUBMISSION.md` into the Devpost submission portal.
 3. [ ] **Final Confirmation**: Review all fields and click **"Submit Project"** before the October 23, 2026, deadline.

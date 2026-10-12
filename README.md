@@ -22,7 +22,7 @@
 ![AmbientOps Calm Mission Control Console](assets/screenshots/overview.png)
 
 ### 🎥 Public Demo Video Walkthrough
-* **Video Submission Status**: `PUBLIC_DEMO_VIDEO_URL_REQUIRED` (To be recorded and linked by the designated video submission owner).  
+* **Public Demo Video**: [Watch the 2:47 walkthrough on YouTube](https://youtu.be/0qtmY3y9X4g).
 * **Production Script & Shot List**: Fully prepared in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md), featuring exact 2:45 timings, UI action cues, and operator voiceover transcripts.
 
 ---
@@ -50,7 +50,7 @@
 | **Smart Entry Event Simulator** | [`backend/smart_entry_simulator.py`](backend/smart_entry_simulator.py) | [`tests/test_ring_simulator.py`](tests/test_ring_simulator.py), [`tests/test_e2e_pipeline.py`](tests/test_e2e_pipeline.py) | **VERIFIED** (5 deterministic simulated sensor scenarios, normalized bounding boxes; no Ring-track eligibility claim) |
 | **Calm Mission Control Web Console** | [`frontend/index.html`](frontend/index.html), [`frontend/styles.css`](frontend/styles.css), [`frontend/app.js`](frontend/app.js) | [`tests/test_browser_e2e.py`](tests/test_browser_e2e.py) | **VERIFIED** (Playwright E2E across 320px–1920px viewports, 0 horizontal scroll, automated Axe scan found zero violations) |
 | **Security & Privacy Defense** | [`backend/server.py`](backend/server.py), [`backend/config.py`](backend/config.py) | [`tests/test_security_headers.py`](tests/test_security_headers.py) | **VERIFIED** (CSP, X-Frame-Options, DNS rebinding Host validation, PII scrubbing) |
-| **Public Demo Video Walkthrough** | Video submission | `PUBLIC_DEMO_VIDEO_URL_REQUIRED` | **PENDING RECORDING** (To be recorded and linked by submission owner) |
+| **Public Demo Video Walkthrough** | Video submission | [YouTube](https://youtu.be/0qtmY3y9X4g) | **VERIFIED** (Public, 2:47, English narration, no copyrighted music, and YouTube copyright checks passed) |
 
 ---
 
