@@ -17,7 +17,7 @@
 
   --text-primary: #0e1f18;      /* Forest ink */
   --text-secondary: #334155;    /* Slate neutral */
-  --text-muted: #475569;        /* Slate neutral for WCAG AA >= 4.5:1 */
+  --text-muted: #475569;        /* Slate neutral for contrast ratio >= 4.5:1 */
   --text-inverse: #ffffff;
 
   --forest-primary: #1b4332;

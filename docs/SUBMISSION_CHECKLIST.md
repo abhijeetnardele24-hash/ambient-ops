@@ -14,7 +14,7 @@
 - [x] **Mini-Challenge Confirmed**: **AWS Builder Mini-Challenge** (Integrated Amazon Bedrock Converse API with Claude 3.5 Sonnet and deterministic offline simulator).
 - [x] **Honest Simulation Disclosure**: Smart entry cameras and sensors explicitly disclosed as simulated via deterministic preset simulator (`backend/smart_entry_simulator.py`). Alexa voice is simulated via browser Web Speech API (`window.speechSynthesis`) with no real physical Echo endpoint claimed.
 - [x] **Human Approval Boundary**: Explicit operator approval gate enforced before simulating any physical smart home remediation.
-- [x] **Calm Mission Control UI**: Off-white paper canvas, forest ink, structural borders; zero glassmorphism, floating orbs, or neon glow. WCAG 2.1 AA accessible with 0 Axe violations.
+- [x] **Calm Mission Control UI**: Off-white paper canvas, forest ink, structural borders; zero glassmorphism, floating orbs, or neon glow. Automated Axe scan found zero violations.
 - [x] **Security Hardening**: CSP, X-Frame-Options, X-Content-Type-Options, X-Request-ID, DNS rebinding defenses, strict CORS allowlist, and zero-innerHTML DOM manipulation.
 - [x] **Automated Tests & Coverage**: 46 passing tests with **87% measured statement coverage** (exceeding >=85% threshold), including unit, integration, Streamable HTTP interop, and Playwright E2E + Axe-core tests.
 - [x] **Official Developer Friction Log**: 4-entry technical friction report in official 7-field format prepared for the +10% bonus evaluation (`docs/FRICTION_LOG.md`).
@@ -22,12 +22,17 @@
 - [x] **Docker Deployment**: `Dockerfile` and `docker-compose.yml` included.
 - [x] **3-Minute Video Script**: Detailed shot list, timings, and voiceover prepared in `docs/DEMO_SCRIPT.md`.
 - [x] **Devpost Draft Copy**: Complete text ready in `docs/DEVPOST_SUBMISSION.md`.
-- [ ] **Public Demo Walkthrough Video**: `PUBLIC_DEMO_VIDEO_URL_REQUIRED` (To be recorded and linked by the dedicated video submission owner).
+- [ ] **Public Demo Walkthrough Video**: `PUBLIC_DEMO_VIDEO_URL_REQUIRED` (Must be under 3 minutes, in English, uploaded publicly to YouTube or Vimeo, contain no copyrighted music/unlicensed footage, visibly demonstrate MCP initialize, tools/list, and tools/call flow, and visibly show whether Bedrock is LIVE or SIMULATED).
 
 ---
 
 ## 2. Final Owner Actions Before Hitting "Submit" on Devpost
 
-1. [ ] **Video Recording**: Record a 2:45 walkthrough following `docs/DEMO_SCRIPT.md`, upload to YouTube (unlisted or public), and paste the YouTube link into Devpost replacing `PUBLIC_DEMO_VIDEO_URL_REQUIRED`.
+1. [ ] **Video Recording**: Record a walkthrough under 3 minutes in English following `docs/DEMO_SCRIPT.md`. Ensure:
+   - Uploaded publicly to YouTube or Vimeo (no private videos).
+   - Zero copyrighted background music or unlicensed third-party footage.
+   - Shows the working MCP flow (`initialize`, `tools/list`, and `tools/call`).
+   - Visibly shows whether Bedrock is in **LIVE** or **SIMULATED** mode (narrator must match visible badge).
+   - Paste the public video link into Devpost replacing `PUBLIC_DEMO_VIDEO_URL_REQUIRED`.
 2. [ ] **Devpost Form Filling**: Copy fields from `docs/DEVPOST_SUBMISSION.md` into the Devpost submission portal.
 3. [ ] **Final Confirmation**: Review all fields and click **"Submit Project"** before the October 23, 2026, deadline.

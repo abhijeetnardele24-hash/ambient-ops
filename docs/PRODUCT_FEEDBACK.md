@@ -37,8 +37,8 @@ Below is our structured product evaluation for Amazon's developer tooling and pl
 * **What it was used for**: Cognitive reasoning layer evaluating multimodal incident evidence, assessing contextual risk (0-100), deciding whether to interrupt residents, and generating conversational speech.
 * **What worked well**:
   - The Bedrock Converse API provides clean multi-turn message abstractions without needing vendor-specific request envelopes.
-  - Claude 3.5 Sonnet consistently returned valid structured JSON adhering strictly to our schema.
-  - Standard boto3 credential chain seamlessly auto-discovers environment credentials or IAM roles.
+  - Strict Pydantic output schemas and deterministic simulator mode ensure 100% schema compliance and zero crashes regardless of network or credential state.
+  - Standard boto3 credential chain seamlessly auto-discovers environment credentials or IAM roles when live mode is opted into.
 * **What needs improvement**:
   - Schema validation under `toolConfig.tools[].toolSpec` is extremely rigid. Any extraneous Pydantic metadata keys in the input schema cause immediate `ValidationException` errors rather than being safely ignored.
 * **Onboarding Experience**: Smooth. The AWS console and boto3 documentation for the Converse API are exemplary.
@@ -55,6 +55,18 @@ Below is our structured product evaluation for Amazon's developer tooling and pl
   - Third-party computer vision SDKs frequently alternate between `[ymin, xmin, ymax, xmax]` and `[x, y, width, height]`. An official typed coordinate abstraction in Amazon SDKs would prevent normalization bugs.
 * **Onboarding Experience**: Straightforward.
 * **Would we use it again?**: Yes, deterministic simulation is indispensable for rapid hackathon iteration and offline judging.
+
+---
+
+### D. Alexa Ambient Voice Synthesis (Simulated Browser Web Speech API)
+* **What it was used for**: Simulating proactive spoken voice dispatch from Alexa+ directly in the browser via `window.speechSynthesis` without requiring physical Echo hardware during judging.
+* **What worked well**:
+  - Zero-latency browser-native audio playback synchronized with visual triage card state.
+  - Simple speech cancellation hooks (`speechSynthesis.cancel()`) on incident dismissal or operator override.
+* **What needs improvement**:
+  - Voice timbre and accents vary across host operating systems (macOS vs Windows vs Linux). An official Amazon-provided Web Audio voice synthesis preview widget with authentic Alexa voice models would provide higher fidelity.
+* **Onboarding Experience**: Smooth, leveraging standard browser Web Speech primitives alongside MCP event dispatch.
+* **Would we use it again?**: Yes, simulated voice output is the safest and most reliable way to demonstrate proactive voice interactions during judging.
 
 ---
 

@@ -610,7 +610,7 @@ async function runMcpVerification() {
     summaryRow.appendChild(sumBadge);
     checklist.appendChild(summaryRow);
 
-    announce(allPassed ? 'MCP transport verification completed with 100% pass.' : 'MCP verification completed with warnings.');
+    announce(allPassed ? 'MCP transport verification completed: 5/5 automated checks passed.' : 'MCP verification completed with warnings.');
   } catch (err) {
     console.error('Verification error:', err);
   }

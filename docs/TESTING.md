@@ -9,7 +9,7 @@ AmbientOps is backed by a comprehensive automated test suite verifying Model Con
 * **Total Test Cases**: **46 passing**
 * **Test Pass Rate**: **100% (46 passed, 0 failed)**
 * **Measured Statement Coverage**: **87%** (703 total statements, 88 missed, 87.5%)
-* **Accessibility Violations**: **0 (Axe-core WCAG 2.1 AA Compliant)**
+* **Accessibility Violations**: **Zero violations (Automated Axe scan)**
 
 ### Breakdown by Module
 | Module | Statements | Missed | Measured Coverage |
@@ -82,5 +82,5 @@ pytest tests/test_security_headers.py -v
 7. **`tests/test_browser_e2e.py`**: Playwright browser E2E test suite:
    - Responsive UI rendering across mobile (375px), tablet (768px), and desktop (1280px) viewports with zero horizontal overflow.
    - Full operator workflow: scenario triggering, evidence rendering, Bedrock triage verification, manual approval click, outcome confirmation, and simulated audio playback.
-   - Automated Axe-core accessibility audit confirming 0 WCAG 2.1 AA violations.
+   - Automated Axe scan confirming zero violations.
    - MCP protocol runner verification checking for "5/5 automated MCP transport checks passed".

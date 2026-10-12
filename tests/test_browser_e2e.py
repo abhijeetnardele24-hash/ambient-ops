@@ -10,7 +10,7 @@ Validates:
 - Accessible modal keyboard navigation (Esc, focus return)
 - Responsive viewports (320px, 360px, 768px, 1024px, 1440px, 1920px)
 - Zero horizontal overflow at 320px
-- Automated Axe-core WCAG 2.1 AA accessibility audit
+- Automated Axe-core accessibility audit (zero violations)
 - Generation of verified UI screenshots
 """
 

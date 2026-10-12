@@ -6,7 +6,7 @@
 [![MCP Spec](https://img.shields.io/badge/MCP%20Spec-2025--11--25-blueviolet.svg)](https://modelcontextprotocol.io/)
 [![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock%20Claude%203.5-ff9900.svg)](https://aws.amazon.com/bedrock/)
 [![Tests](https://img.shields.io/badge/tests-46%20passed%20(87%25%20cov)-brightgreen.svg)](tests/)
-[![Axe A11y](https://img.shields.io/badge/axe--core-WCAG%202.1%20AA%20Pass-success.svg)](tests/test_browser_e2e.py)
+[![Axe A11y](https://img.shields.io/badge/axe--core-zero%20violations-success.svg)](tests/test_browser_e2e.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > Built for **Build, Ship, Shape: Amazon Developer Hackathon 2026**  
@@ -43,12 +43,12 @@
 
 | Component / Capability | Implementation Source | Test & Verification Evidence | Verification Status |
 | :--- | :--- | :--- | :--- |
-| **Streamable HTTP MCP Transport** (Spec v2025-11-25) | [`backend/mcp_server.py`](backend/mcp_server.py), [`backend/server.py`](backend/server.py) | [`tests/test_mcp_interop.py`](tests/test_mcp_interop.py), [`tests/test_mcp_server.py`](tests/test_mcp_server.py) | **VERIFIED** (Official `mcp==2.3.0` SDK client session, 202 bodyless notifs, Mcp-Session-Id header) |
+| **Streamable HTTP MCP Transport** (Spec v2025-11-25) | [`backend/mcp_server.py`](backend/mcp_server.py), [`backend/server.py`](backend/server.py) | [`tests/test_mcp_interop.py`](tests/test_mcp_interop.py), [`tests/test_mcp_server.py`](tests/test_mcp_server.py) | **VERIFIED** (5/5 automated MCP transport checks passed using the official SDK, 202 bodyless notifs, Mcp-Session-Id header) |
 | **Human Operator Approval Gate** | [`backend/server.py`](backend/server.py), [`frontend/app.js`](frontend/app.js) | [`tests/test_approval_flow.py`](tests/test_approval_flow.py), [`tests/test_browser_e2e.py`](tests/test_browser_e2e.py) | **VERIFIED** (Idempotent 200/409 transitions, strict IncidentStatus enum, allowlisted actions) |
 | **Amazon Bedrock Cognitive Triage** | [`backend/bedrock_agent.py`](backend/bedrock_agent.py) | [`tests/test_bedrock_agent.py`](tests/test_bedrock_agent.py), [`tests/test_bedrock_mocking.py`](tests/test_bedrock_mocking.py) | **VERIFIED** (Converse API model call with deterministic offline simulator fallback) |
-| **Alexa+ Proactive Voice Dispatch** | [`backend/mcp_server.py`](backend/mcp_server.py), [`frontend/app.js`](frontend/app.js) | [`tests/test_mcp_server.py`](tests/test_mcp_server.py), [`tests/test_browser_e2e.py`](tests/test_browser_e2e.py) | **VERIFIED** (`is_simulated: True` MCP tool + browser Web Speech API simulation) |
-| **Smart Entry Event Simulator** | [`backend/smart_entry_simulator.py`](backend/smart_entry_simulator.py) | [`tests/test_ring_simulator.py`](tests/test_ring_simulator.py), [`tests/test_e2e_pipeline.py`](tests/test_e2e_pipeline.py) | **VERIFIED** (5 deterministic sensor scenarios, normalized bounding boxes) |
-| **Calm Mission Control Web Console** | [`frontend/index.html`](frontend/index.html), [`frontend/styles.css`](frontend/styles.css), [`frontend/app.js`](frontend/app.js) | [`tests/test_browser_e2e.py`](tests/test_browser_e2e.py) | **VERIFIED** (Playwright E2E across 320px–1920px viewports, 0 horizontal scroll, 0 Axe a11y violations) |
+| **Alexa Ambient Voice Dispatch** | [`backend/mcp_server.py`](backend/mcp_server.py), [`frontend/app.js`](frontend/app.js) | [`tests/test_mcp_server.py`](tests/test_mcp_server.py), [`tests/test_browser_e2e.py`](tests/test_browser_e2e.py) | **VERIFIED** (`is_simulated: True` MCP tool + browser Web Speech API output simulation; no physical Echo endpoint) |
+| **Smart Entry Event Simulator** | [`backend/smart_entry_simulator.py`](backend/smart_entry_simulator.py) | [`tests/test_ring_simulator.py`](tests/test_ring_simulator.py), [`tests/test_e2e_pipeline.py`](tests/test_e2e_pipeline.py) | **VERIFIED** (5 deterministic simulated sensor scenarios, normalized bounding boxes; no Ring-track eligibility claim) |
+| **Calm Mission Control Web Console** | [`frontend/index.html`](frontend/index.html), [`frontend/styles.css`](frontend/styles.css), [`frontend/app.js`](frontend/app.js) | [`tests/test_browser_e2e.py`](tests/test_browser_e2e.py) | **VERIFIED** (Playwright E2E across 320px–1920px viewports, 0 horizontal scroll, automated Axe scan found zero violations) |
 | **Security & Privacy Defense** | [`backend/server.py`](backend/server.py), [`backend/config.py`](backend/config.py) | [`tests/test_security_headers.py`](tests/test_security_headers.py) | **VERIFIED** (CSP, X-Frame-Options, DNS rebinding Host validation, PII scrubbing) |
 | **Public Demo Video Walkthrough** | Video submission | `PUBLIC_DEMO_VIDEO_URL_REQUIRED` | **PENDING RECORDING** (To be recorded and linked by submission owner) |
 
@@ -161,7 +161,7 @@ Conforming strictly to **MCP v2025-11-25**, AmbientOps provides standard tools, 
 | `smart_entry_poll_events` | `limit: int` | Polls recent motion, dwell, and entry events from simulated cameras. |
 | `smart_entry_trigger_scenario` | `scenario_id: string` | Triggers a simulated scenario preset in the entry simulator. |
 | `bedrock_reason_triage` | `event_id: string` | Invokes Amazon Bedrock Converse API for cognitive risk assessment. |
-| `alexa_proactive_dispatch` | `spoken_text, urgency, target_room` | Dispatches vocal speech or chime to the Alexa+ ambient audio layer. |
+| `alexa_proactive_dispatch` | `spoken_text, urgency, target_room` | Dispatches simulated vocal speech prompt via browser Web Speech API. |
 | `household_action_execute` | `action_name, parameters` | Executes simulated smart hardware remediations after human approval. |
 
 ### 2. Registered MCP Resources
@@ -191,11 +191,26 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment (Optional for Live AWS Bedrock)
+### 2. Configure Environment & Simulation Defaults
 ```bash
 cp .env.example .env
 ```
 *Note: By default, `FORCE_BEDROCK_SIMULATOR=true` and `ENABLE_LIVE_BEDROCK=false` operate in safe, deterministic simulator mode with zero paid credentials. To opt in to live Amazon Bedrock, set `FORCE_BEDROCK_SIMULATOR=false` and `ENABLE_LIVE_BEDROCK=true` alongside valid AWS credentials.*
+
+#### Optional: Verify Live Amazon Bedrock (Opt-in)
+To run a safe, live verification call against the Amazon Bedrock Converse API (Claude 3.5 Sonnet) and save sanitized operational telemetry:
+```bash
+# On Windows (PowerShell):
+$env:ENABLE_LIVE_BEDROCK="true"
+$env:FORCE_BEDROCK_SIMULATOR="false"
+python scripts/verify_live_bedrock.py
+
+# On Linux / macOS:
+export ENABLE_LIVE_BEDROCK=true
+export FORCE_BEDROCK_SIMULATOR=false
+python scripts/verify_live_bedrock.py
+```
+*This command executes a single scenario against Bedrock, verifies schema conformance, fails safely unless `provider_mode` is `bedrock-live`, and logs only sanitized latency/token telemetry (zero credentials or personal information).*
 
 ### 3. Launch the Application
 ```bash
@@ -216,7 +231,7 @@ pytest --cov=backend --cov-report=term-missing tests/ -v
 **Measured Results**:
 * **46 passing tests** (100% pass rate)
 * **87% measured statement coverage** across all critical backend modules (exceeding >=85% threshold).
-* **0 accessibility violations** verified via automated Axe-core audit across mobile, tablet, and desktop viewports.
+* **Automated Axe scan found zero violations** across mobile, tablet, and desktop viewports.
 
 ---
 
