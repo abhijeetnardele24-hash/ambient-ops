@@ -196,10 +196,10 @@ def test_mission_control_e2e_and_accessibility(live_server, browser_context):
 
     # Wait for 5/5 checklist to pass
     page.wait_for_function(
-        "() => document.getElementById('mcpVerifyChecklist').textContent.includes('5/5 MCP PROTOCOL CHECKS VERIFIED')",
+        "() => document.getElementById('mcpVerifyChecklist').textContent.includes('5/5 automated MCP transport checks passed')",
         timeout=15000,
     )
-    assert "100% SPEC COMPLIANT" in page.locator("#mcpVerifyChecklist").inner_text()
+    assert "5/5 automated MCP transport checks passed" in page.locator("#mcpVerifyChecklist").inner_text()
 
     # Press Escape key to close modal
     page.keyboard.press("Escape")

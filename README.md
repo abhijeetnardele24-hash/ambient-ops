@@ -5,7 +5,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg)](https://fastapi.tiangolo.com/)
 [![MCP Spec](https://img.shields.io/badge/MCP%20Spec-2025--11--25-blueviolet.svg)](https://modelcontextprotocol.io/)
 [![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock%20Claude%203.5-ff9900.svg)](https://aws.amazon.com/bedrock/)
-[![Tests](https://img.shields.io/badge/tests-45%20passed%20(88%25%20cov)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-46%20passed%20(87%25%20cov)-brightgreen.svg)](tests/)
 [![Axe A11y](https://img.shields.io/badge/axe--core-WCAG%202.1%20AA%20Pass-success.svg)](tests/test_browser_e2e.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -59,7 +59,7 @@
 
 When a critical or actionable event occurs—such as a package left in incoming rain, an elderly resident remaining motionless past medical reminder times, or a pet escaping through an unlatched gate—AmbientOps evaluates environmental context, formulates a concise **Decision Rationale** and **Recommended Action**, and presents it at an **unmistakable human approval boundary**.
 
-Once confirmed by an operator, the agent dispatches natural, proactive spoken dialogues directly to **Alexa+** ambient endpoints while autonomously executing simulated smart home remedies.
+Once confirmed by an operator, the agent synthesizes natural, proactive spoken dialogues simulated via browser Web Speech audio output (`window.speechSynthesis`) while autonomously executing simulated smart home remedies.
 
 ### Primary Operator Sequence
 ```
@@ -93,7 +93,7 @@ graph TD
         D3 --> SIM_BUS
     end
 
-    subgraph TRUST_BOUNDARY ["AmbientOps Core Backend (FastAPI / SSE)"]
+    subgraph TRUST_BOUNDARY ["AmbientOps Core Backend (FastAPI / Streamable HTTP)"]
         INGEST["FastAPI Ingestion & Normalizer<br/>(/api/events/trigger)"]:::core
         SIM_BUS -->|Event Webhook Payload| INGEST
         
@@ -131,7 +131,7 @@ graph TD
     end
 
     subgraph OUTCOME_STAGE ["Action Execution & Outcome Verification"]
-        DISPATCH_VOICE["Alexa+ Ambient Voice Dispatch<br/>(Vocal Speech Prompt Synthesis)"]:::core
+        DISPATCH_VOICE["Alexa Ambient Voice Dispatch<br/>(Simulated Browser Web Speech Synthesis)"]:::core
         EXEC_ACTION["Simulated Smart Hardware Actuator<br/>(Door Lock, Porch Bench, Spotlight)"]:::sim
         AUDIT["Incident Audit Ledger<br/>(Outcome Verified & Timestamps)"]:::core
 
@@ -195,7 +195,7 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env
 ```
-*Note: By default, `FORCE_BEDROCK_SIMULATOR=false` will use live Bedrock if AWS credentials exist in your environment. If no credentials exist, it automatically operates in deterministic simulator mode with zero paid credentials.*
+*Note: By default, `FORCE_BEDROCK_SIMULATOR=true` and `ENABLE_LIVE_BEDROCK=false` operate in safe, deterministic simulator mode with zero paid credentials. To opt in to live Amazon Bedrock, set `FORCE_BEDROCK_SIMULATOR=false` and `ENABLE_LIVE_BEDROCK=true` alongside valid AWS credentials.*
 
 ### 3. Launch the Application
 ```bash
@@ -214,8 +214,8 @@ pytest --cov=backend --cov-report=term-missing tests/ -v
 ```
 
 **Measured Results**:
-* **45 passing tests** (100% pass rate)
-* **88% measured statement coverage** across all critical backend modules.
+* **46 passing tests** (100% pass rate)
+* **87% measured statement coverage** across all critical backend modules (exceeding >=85% threshold).
 * **0 accessibility violations** verified via automated Axe-core audit across mobile, tablet, and desktop viewports.
 
 ---

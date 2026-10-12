@@ -52,17 +52,7 @@ ALLOWED_SIMULATED_ACTIONS = {
 }
 
 
-# --- Official MCP SDK Server Instance ---
-sdk_mcp_server = MCPServer(
-    name="AmbientOps-AlexaPlus-MCP",
-    version=settings.version,
-)
-
-
-@sdk_mcp_server.tool(
-    name="smart_entry_poll_events",
-    description="Retrieve recent smart home motion, dwell, and entry sensor events from simulated cameras.",
-)
+# --- Standalone Tool & Resource Implementations ---
 def smart_entry_poll_events(limit: int = 5) -> str:
     """Retrieve recent smart entry sensor events."""
     if limit < 1 or limit > 20:
@@ -76,18 +66,10 @@ def smart_entry_poll_events(limit: int = 5) -> str:
     })
 
 
-@sdk_mcp_server.tool(
-    name="ring_poll_events",
-    description="[Compatibility Alias] Retrieve smart home entry sensor events.",
-)
 def ring_poll_events(limit: int = 5) -> str:
     return smart_entry_poll_events(limit)
 
 
-@sdk_mcp_server.tool(
-    name="smart_entry_trigger_scenario",
-    description="Simulate an entry camera event scenario (e.g. delivery_weather_risk, elder_immobility_alert, pet_escape_risk).",
-)
 def smart_entry_trigger_scenario(scenario_id: str) -> str:
     """Simulate a camera event scenario."""
     if not scenario_id:
@@ -102,18 +84,10 @@ def smart_entry_trigger_scenario(scenario_id: str) -> str:
     })
 
 
-@sdk_mcp_server.tool(
-    name="ring_trigger_scenario",
-    description="[Compatibility Alias] Simulate a smart camera event scenario.",
-)
 def ring_trigger_scenario(scenario_id: str) -> str:
     return smart_entry_trigger_scenario(scenario_id)
 
 
-@sdk_mcp_server.tool(
-    name="bedrock_reason_triage",
-    description="Invoke Amazon Bedrock (Claude 3.5 Sonnet / Converse API) to evaluate risk, determine if resident should be interrupted, and craft spoken dialogue.",
-)
 def bedrock_reason_triage(event_id: str) -> str:
     """Evaluate risk and create triage decision via Amazon Bedrock."""
     if not event_id:
@@ -145,10 +119,6 @@ def bedrock_reason_triage(event_id: str) -> str:
     })
 
 
-@sdk_mcp_server.tool(
-    name="alexa_proactive_dispatch",
-    description="Dispatch a spoken voice announcement or chime to target Alexa+ ambient endpoint (Simulated).",
-)
 def alexa_proactive_dispatch(
     spoken_text: str,
     urgency: str = "moderate",
@@ -171,10 +141,6 @@ def alexa_proactive_dispatch(
     })
 
 
-@sdk_mcp_server.tool(
-    name="household_action_execute",
-    description="Execute an approved simulated smart home remediation action after human approval.",
-)
 def household_action_execute(
     action_name: str,
     parameters: Optional[Dict[str, Any]] = None,
@@ -197,18 +163,14 @@ def household_action_execute(
     })
 
 
-# Register Resources on SDK Server
-@sdk_mcp_server.resource(uri="ambient://devices/sensors/live")
 def get_sensor_fleet_resource() -> str:
     return json.dumps(smart_entry_simulator.get_device_catalog())
 
 
-@sdk_mcp_server.resource(uri="ambient://devices/ring/live")
 def get_ring_sensors_alias() -> str:
     return json.dumps(smart_entry_simulator.get_device_catalog())
 
 
-@sdk_mcp_server.resource(uri="ambient://household/context")
 def get_household_context_resource() -> str:
     return json.dumps({
         "household_name": settings.household_name,
@@ -219,7 +181,6 @@ def get_household_context_resource() -> str:
     })
 
 
-@sdk_mcp_server.resource(uri="ambient://telemetry/mcp")
 def get_telemetry_resource() -> str:
     return json.dumps({
         "active_transport": "Streamable HTTP (MCP v2025-11-25)",
@@ -229,15 +190,66 @@ def get_telemetry_resource() -> str:
     })
 
 
-# Register Prompts on SDK Server
-@sdk_mcp_server.prompt(name="triage_incident")
 def triage_incident_prompt() -> str:
     return "Analyze the following smart device sensor detections and determine whether to interrupt the resident via Alexa+."
 
 
-@sdk_mcp_server.prompt(name="daily_ambient_brief")
 def daily_ambient_brief_prompt() -> str:
     return "Summarize all smart entry security and motion events from 11 PM to 7 AM into a 30-second Alexa+ verbal briefing."
+
+
+def register_mcp_capabilities(server: MCPServer) -> None:
+    """Registers canonical tools, resources, and prompts onto an official MCPServer instance."""
+    server.tool(
+        name="smart_entry_poll_events",
+        description="Retrieve recent smart home motion, dwell, and entry sensor events from simulated cameras.",
+    )(smart_entry_poll_events)
+    server.tool(
+        name="ring_poll_events",
+        description="[Compatibility Alias] Retrieve smart home entry sensor events.",
+    )(ring_poll_events)
+    server.tool(
+        name="smart_entry_trigger_scenario",
+        description="Simulate an entry camera event scenario (e.g. delivery_weather_risk, elder_immobility_alert, pet_escape_risk).",
+    )(smart_entry_trigger_scenario)
+    server.tool(
+        name="ring_trigger_scenario",
+        description="[Compatibility Alias] Simulate a smart camera event scenario.",
+    )(ring_trigger_scenario)
+    server.tool(
+        name="bedrock_reason_triage",
+        description="Invoke Amazon Bedrock (Claude 3.5 Sonnet / Converse API) to evaluate risk, determine if resident should be interrupted, and craft spoken dialogue.",
+    )(bedrock_reason_triage)
+    server.tool(
+        name="alexa_proactive_dispatch",
+        description="Dispatch a spoken voice announcement or chime to target Alexa+ ambient endpoint (Simulated).",
+    )(alexa_proactive_dispatch)
+    server.tool(
+        name="household_action_execute",
+        description="Execute an approved simulated smart home remediation action after human approval.",
+    )(household_action_execute)
+
+    server.resource(uri="ambient://devices/sensors/live")(get_sensor_fleet_resource)
+    server.resource(uri="ambient://devices/ring/live")(get_ring_sensors_alias)
+    server.resource(uri="ambient://household/context")(get_household_context_resource)
+    server.resource(uri="ambient://telemetry/mcp")(get_telemetry_resource)
+
+    server.prompt(name="triage_incident")(triage_incident_prompt)
+    server.prompt(name="daily_ambient_brief")(daily_ambient_brief_prompt)
+
+
+def create_sdk_mcp_server() -> MCPServer:
+    """Factory creating an official MCPServer instance populated with canonical capabilities."""
+    server = MCPServer(
+        name="AmbientOps-AlexaPlus-MCP",
+        version=settings.version,
+    )
+    register_mcp_capabilities(server)
+    return server
+
+
+# Default singleton instance for direct utility imports
+sdk_mcp_server = create_sdk_mcp_server()
 
 
 # --- Unified MCP Server Controller & History Logger ---
@@ -454,10 +466,11 @@ class McpServer:
             ],
         )
 
-    def create_streamable_http_app(self):
-        """Creates the official Starlette Streamable HTTP transport application."""
+    def create_streamable_http_app(self, server: Optional[MCPServer] = None):
+        """Creates the official Starlette Streamable HTTP transport application using a fresh or provided server."""
+        target_server = server or create_sdk_mcp_server()
         sec = self.create_transport_security()
-        return sdk_mcp_server.streamable_http_app(
+        return target_server.streamable_http_app(
             streamable_http_path="/mcp",
             transport_security=sec,
         )

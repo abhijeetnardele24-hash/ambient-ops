@@ -54,9 +54,14 @@ class Settings(BaseModel):
     bedrock_read_timeout: float = float(os.getenv("BEDROCK_READ_TIMEOUT", "15.0"))
     bedrock_max_retries: int = int(os.getenv("BEDROCK_MAX_RETRIES", "2"))
 
-    # If explicitly set to true, force simulator mode regardless of credentials
+    # Explicit opt-in required for live AWS Bedrock invocation
+    enable_live_bedrock: bool = os.getenv(
+        "ENABLE_LIVE_BEDROCK", "false"
+    ).lower() in ("true", "1", "yes")
+
+    # Safe Docker/demo default: deterministic simulator (requires explicit opt-in for live AWS)
     force_bedrock_simulator: bool = os.getenv(
-        "FORCE_BEDROCK_SIMULATOR", "false"
+        "FORCE_BEDROCK_SIMULATOR", "true"
     ).lower() in ("true", "1", "yes")
 
     # Simulation Telemetry Secret (optional webhook verification - no insecure default)

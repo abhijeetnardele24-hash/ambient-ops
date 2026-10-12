@@ -14,7 +14,8 @@ import httpx2
 
 from mcp.client.streamable_http import streamable_http_client
 from mcp.client.session import ClientSession
-from backend.server import app
+from backend.server import app, create_app
+from backend.mcp_server import create_sdk_mcp_server
 
 
 @pytest.mark.asyncio
@@ -219,3 +220,32 @@ async def test_malformed_json_and_invalid_protocol_errors():
             # Response should indicate method not found or bad request error
             assert res.status_code in (200, 400)
             assert "error" in res.text or "-32601" in res.text or "not found" in res.text.lower()
+
+
+@pytest.mark.asyncio
+async def test_app_factory_and_repeated_lifespan_cycles():
+    """Validates that create_app factory and repeated lifespans instantiate fresh session managers without error."""
+    custom_server = create_sdk_mcp_server()
+    custom_app = create_app(custom_server)
+
+    for cycle in range(2):
+        async with custom_app.router.lifespan_context(custom_app):
+            transport = httpx2.ASGITransport(app=custom_app)
+            async with httpx2.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
+                init_req = {
+                    "jsonrpc": "2.0",
+                    "id": f"cycle-{cycle}",
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                        "clientInfo": {"name": "factory-test", "version": "1.0"},
+                    },
+                }
+                res = await client.post(
+                    "/mcp",
+                    json=init_req,
+                    headers={"Accept": "application/json, text/event-stream"},
+                )
+                assert res.status_code == 200
+                assert res.headers.get("mcp-session-id") is not None

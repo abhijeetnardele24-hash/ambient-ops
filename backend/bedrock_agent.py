@@ -38,10 +38,10 @@ class BedrockAgent:
         self._initialize_client()
 
     def _initialize_client(self):
-        """Attempts to initialize boto3 bedrock-runtime via standard credential chain."""
-        if settings.force_bedrock_simulator:
+        """Attempts to initialize boto3 bedrock-runtime via standard credential chain only if explicitly enabled."""
+        if settings.force_bedrock_simulator or not settings.enable_live_bedrock:
             self.provider_mode = "deterministic-simulator"
-            logger.info("Bedrock agent configured for deterministic simulator mode.")
+            logger.info("Bedrock agent configured for deterministic simulator mode (safe demo default).")
             return
 
         try:

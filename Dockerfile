@@ -18,7 +18,8 @@ EXPOSE 8000
 
 ENV HOST=0.0.0.0
 ENV PORT=8000
-ENV FORCE_BEDROCK_SIMULATOR=false
+ENV FORCE_BEDROCK_SIMULATOR=true
+ENV ENABLE_LIVE_BEDROCK=false
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1

@@ -599,7 +599,7 @@ async function runMcpVerification() {
 
     const sumTitle = document.createElement('span');
     sumTitle.textContent = allPassed
-      ? '★ 5/5 MCP PROTOCOL CHECKS VERIFIED (100% SPEC COMPLIANT v2025-11-25)'
+      ? '★ 5/5 automated MCP transport checks passed (MCP v2025-11-25)'
       : '⚠ MCP SPECIFICATION CHECKS INCOMPLETE';
 
     const sumBadge = document.createElement('span');

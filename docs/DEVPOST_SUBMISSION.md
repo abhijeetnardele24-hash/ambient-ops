@@ -12,7 +12,7 @@
 1. **Alexa+ Track (Primary)**: Building next-generation ambient add-ons using the **Model Context Protocol (MCP)** open standard (specification v2025-11-25) for Agent Skills and Streamable HTTP transports.
 2. **AWS Builder Mini-Challenge**: Advanced generative AI reasoning and triage using **Amazon Bedrock (Claude 3.5 Sonnet / Bedrock Converse API)**.
 
-*(Note: Smart entry cameras and sensors are tested via our internal Smart Entry Event Simulator; all events are explicitly disclosed as simulated).*
+*(Note: Smart entry cameras and sensors are tested via our internal Smart Entry Event Simulator; all events are explicitly disclosed as simulated. Alexa voice responses are synthesized via browser Web Speech API audio output; no physical Echo hardware endpoint is claimed).*
 
 ---
 
@@ -30,7 +30,7 @@ With Amazon introducing the **Model Context Protocol (MCP)** for **Alexa+**, we 
 2. **Observe Structured Evidence**: Normalizes detections (bounding boxes, confidence levels), environmental telemetry (precipitation forecasts, ambient lux), and resident context into structured evidence.
 3. **Bedrock Cognitive Triage**: Evaluates events using Amazon Bedrock (Claude 3.5 Sonnet) to compute a dynamic **Risk Index (0-100)**, assess environmental conditions, and formulate a concise **Decision Rationale** and **Recommended Action**.
 4. **Human Approval Boundary**: The system pauses at an explicit operator gate (`PENDING_OPERATOR_APPROVAL`). The human operator inspects the evidence and recommendation, and must click **"Approve Simulation"** before any action executes.
-5. **Proactive Alexa+ Voice Dispatch**: If vocal intervention is recommended and approved, the agent dispatches natural, conversational speech directly to the Alexa+ endpoint (*"Excuse me, Resident. Your front porch camera observed a package delivery, and rain is forecast in 15 minutes. Would you like me to unlock the porch storage bench?"*).
+5. **Proactive Alexa Ambient Voice Dispatch (Web Speech Simulation)**: If vocal intervention is recommended and approved, the system synthesizes natural, conversational speech prompt output via browser Web Speech API (`window.speechSynthesis`) (*"Excuse me, Resident. Your front porch camera observed a package delivery, and rain is forecast in 15 minutes. Would you like me to unlock the porch storage bench?"*).
 6. **Simulated Action & Outcome Verification**: Executes the remediation simulation (e.g. unlocking porch storage benches, illuminating pathway lights) and records an auditable entry in the incident ledger.
 7. **Live MCP Protocol Inspector**: Displays real-time, bidirectional JSON-RPC 2.0 messages, Streamable HTTP streams, tool schemas, and latencies.
 
@@ -41,7 +41,7 @@ With Amazon introducing the **Model Context Protocol (MCP)** for **Alexa+**, we 
 * **Canonical Streamable HTTP Transport**: Implemented official Streamable HTTP transport at `/mcp` with `Mcp-Session-Id` session management, bodyless notification handling (HTTP 202 Accepted), and DNS rebinding protections.
 * **Cognitive Layer (AWS Builder Mini-Challenge)**: Integrated Amazon Bedrock Converse API with Claude 3.5 Sonnet using standard AWS credential provider chains, paired with an offline deterministic simulator for reliable, zero-cost verification.
 * **Frontend Design**: Built according to the **Calm Mission Control** design system (paper canvas, forest ink, 1px structural borders, zero glassmorphism or neon blur, WCAG 2.1 AA compliant).
-* **Security & Quality**: Enforced CSP, X-Frame-Options, X-Request-ID headers, CORS allowlists, safe DOM manipulation (zero untrusted `innerHTML`), and an automated 45-test test suite with **88% measured statement coverage** including Playwright E2E and Axe-core accessibility verification.
+* **Security & Quality**: Enforced CSP, X-Frame-Options, X-Request-ID headers, CORS allowlists, safe DOM manipulation (zero untrusted `innerHTML`), and an automated 46-test test suite with **87% measured statement coverage** including Playwright E2E and Axe-core accessibility verification.
 
 ---
 
@@ -54,7 +54,7 @@ With Amazon introducing the **Model Context Protocol (MCP)** for **Alexa+**, we 
 ## Accomplishments We're Proud Of
 * 100% adherence to official MCP standard v2025-11-25 using `mcp.server.mcpserver.MCPServer`.
 * An explicit, unmistakable human approval boundary that prevents rogue AI actuation.
-* 45 automated unit, integration, and browser E2E tests passing with **88% measured statement coverage**.
+* 46 automated unit, integration, and browser E2E tests passing with **87% measured statement coverage**.
 * Automated Axe-core audit confirming zero WCAG 2.1 AA accessibility violations.
 * Comprehensive 4-entry Developer Friction Log in official 7-field format submitted for the +10% evaluation bonus.
 
@@ -82,5 +82,5 @@ With Amazon introducing the **Model Context Protocol (MCP)** for **Alexa+**, we 
 * `Streamable HTTP Transport`
 * `Playwright & Axe-core`
 * `Web Speech API`
-* `Pytest (88% Statement Coverage)`
+* `Pytest (87% Statement Coverage)`
 * `Docker`

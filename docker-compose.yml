@@ -9,6 +9,7 @@ services:
     environment:
       - HOST=0.0.0.0
       - PORT=8000
-      - FORCE_BEDROCK_SIMULATOR=false
+      - FORCE_BEDROCK_SIMULATOR=true
+      - ENABLE_LIVE_BEDROCK=false
       - AWS_REGION=us-east-1
     restart: unless-stopped

@@ -35,7 +35,7 @@ graph TD
         D3 --> SIM_BUS
     end
 
-    subgraph TRUST_BOUNDARY ["AmbientOps Core Backend (FastAPI / SSE)"]
+    subgraph TRUST_BOUNDARY ["AmbientOps Core Backend (FastAPI / Streamable HTTP)"]
         INGEST["FastAPI Ingestion & Normalizer<br/>(/api/events/trigger)"]:::core
         SIM_BUS -->|Event Webhook Payload| INGEST
         
@@ -43,7 +43,7 @@ graph TD
         INGEST --> EVID
 
         subgraph MCP_CORE ["Model Context Protocol (v2025-11-25)"]
-            MCP_ENG["MCP Server Engine<br/>(/mcp & /mcp/sse)"]:::core
+            MCP_ENG["MCP Server Engine<br/>(Canonical /mcp Streamable HTTP)"]:::core
             T_POLL["Tool: smart_entry_poll_events"]:::core
             T_TRIAGE["Tool: bedrock_reason_triage"]:::core
             T_DISPATCH["Tool: alexa_proactive_dispatch"]:::core
@@ -73,7 +73,7 @@ graph TD
     end
 
     subgraph OUTCOME_STAGE ["Action Execution & Outcome Verification"]
-        DISPATCH_VOICE["Alexa+ Ambient Voice Dispatch<br/>(Vocal Speech Prompt Synthesis)"]:::core
+        DISPATCH_VOICE["Alexa Ambient Voice Dispatch<br/>(Simulated Browser Web Speech Synthesis)"]:::core
         EXEC_ACTION["Simulated Smart Hardware Actuator<br/>(Door Lock, Porch Bench, Spotlight)"]:::sim
         AUDIT["Incident Audit Ledger<br/>(Outcome Verified & Timestamps)"]:::core
 
@@ -86,7 +86,7 @@ graph TD
 
     subgraph CLIENT_UI ["Calm Mission Control Interface"]
         UI_WORKSPACE["Web Workspace (HTML5 / Vanilla JS)<br/>• Dominant Evidence Canvas<br/>• Operator Approval Boundary Card<br/>• Live MCP Protocol Inspector"]:::core
-        MCP_ENG <-->|Streamable HTTP SSE| UI_WORKSPACE
+        MCP_ENG <-->|Streamable HTTP /mcp| UI_WORKSPACE
         AUDIT --> UI_WORKSPACE
     end
 ```

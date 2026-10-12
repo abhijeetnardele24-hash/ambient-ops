@@ -1,17 +1,17 @@
 # Amazon Developer Experience & SDK Product Feedback Report
 
 **Event**: *Build, Ship, Shape: Amazon Developer Hackathon 2026*  
-**Author**: Abhijeet Nardele (Lead Engineer, Team MetaMask)  
+**Author**: AmbientOps Engineering Team  
 **Deliverable**: Comprehensive Developer & Platform Feedback  
 
 ---
 
 ## 1. Overview of Evaluated Technologies
 During the development of AmbientOps, our team designed an end-to-end ambient incident response system integrating:
-1. **Model Context Protocol (MCP v2025-11-25) & Streamable HTTP Transports**
+1. **Model Context Protocol (MCP v2025-11-25) & Streamable HTTP Transports (`/mcp`)**
 2. **Amazon Bedrock (Converse API with Claude 3.5 Sonnet)**
-3. **Alexa+ Ambient Agent Skills & Voice Synthesis**
-4. **Smart Entry Camera & Sensor Telemetry Ingestion**
+3. **Alexa Ambient Voice Synthesis (Simulated Browser Web Speech Output)**
+4. **Smart Entry Camera & Sensor Telemetry Ingestion (Deterministic Simulation)**
 
 Below is our structured product evaluation for Amazon's developer tooling and platform teams.
 
@@ -24,10 +24,11 @@ Below is our structured product evaluation for Amazon's developer tooling and pl
 * **What worked well**: 
   - Standardizing on open JSON-RPC 2.0 schemas decoupled device knowledge from proprietary Alexa Skill skill-models.
   - Pydantic models cleanly validate input arguments against tool schemas.
+  - Canonical Streamable HTTP `/mcp` transport allows bi-directional tool execution over standard HTTP/2 and HTTP/1.1 connections.
 * **What needs improvement**:
-  - Streamable HTTP over Server-Sent Events (SSE) currently requires asymmetric endpoints (SSE for push events, POST for RPC requests). A standardized session token header across reconnects is needed to prevent dropped messages on cellular or poor Wi-Fi handoffs.
+  - In `mcp==2.3.0`, `StreamableHTTPSessionManager.run()` locks task groups to an individual lifespan cycle. Application frameworks need better documentation and first-party patterns for ASGI session-scoped lifecycles.
   - Lack of an official Amazon-hosted local testing harness for Alexa+ MCP clients required us to engineer a custom web simulator console.
-* **Onboarding Experience**: Moderate. The MCP core specifications are clear, but practical guidance on bridging MCP with Alexa+ voice output required architectural experimentation.
+* **Onboarding Experience**: Moderate. The MCP core specifications are clear, but practical guidance on bridging MCP with simulated ambient voice output required architectural experimentation.
 * **Would we use it again?**: **Yes, absolutely.** MCP is the best architectural shift Amazon has made in years for open agentic interoperability.
 
 ---

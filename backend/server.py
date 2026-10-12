@@ -8,17 +8,20 @@ from contextlib import asynccontextmanager
 from enum import Enum
 import json
 import logging
+from pathlib import Path
 import re
 import time
-import uuid
-from pathlib import Path
 from typing import Any, Dict, List, Optional
+import uuid
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from mcp.server.mcpserver import MCPServer
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from pydantic import BaseModel, Field
+from starlette.types import Receive, Scope, Send
 
 from .config import settings
 from .mcp_server import (
@@ -35,55 +38,32 @@ logger = logging.getLogger("ambient_ops.server")
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
 
-# Build official MCP Streamable HTTP transport app
-sec_settings = mcp_server.create_transport_security()
-sdk_mcp_app = sdk_mcp_server.streamable_http_app(
-    streamable_http_path="/mcp",
-    transport_security=sec_settings,
-    json_response=False,
-)
 
+class McpStreamableHttpEndpoint:
+    """Dynamic ASGI handler routing /mcp traffic to the active StreamableHTTPSessionManager."""
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Manages the application lifecycle, including MCP session manager task group."""
-    logger.info("Starting AmbientOps server lifecycle...")
-    sm = getattr(sdk_mcp_server._lowlevel_server, "_session_manager", None)
-    if sm and getattr(sm, "_has_started", False):
-        sm._has_started = False
+    def __init__(self, get_session_manager):
+        self._get_sm = get_session_manager
 
-    try:
-        async with sdk_mcp_app.router.lifespan_context(sdk_mcp_app):
-            yield
-    finally:
-        if sm:
-            sm._has_started = False
-        logger.info("Shutting down AmbientOps server lifecycle...")
-
-
-app = FastAPI(
-    title=settings.app_name,
-    description="Multi-Device Incident Response Console for Alexa+ and Smart Sensors via Model Context Protocol",
-    version=settings.version,
-    lifespan=lifespan,
-)
-
-# CORS Middleware with explicit origins and exposed session header
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_allowed_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["Mcp-Session-Id", "X-Request-ID", "Content-Type", "Deprecation"],
-)
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        sm = self._get_sm()
+        if sm is None:
+            res = Response(
+                content=json.dumps({
+                    "detail": "MCP server session manager is not active. Make sure to run within application lifespan.",
+                }),
+                status_code=503,
+                media_type="application/json",
+            )
+            await res(scope, receive, send)
+            return
+        await sm.asgi_app(scope, receive, send)
 
 
 # --- Security Headers, Tracing & Host Validation Middleware ---
 SAFE_REQ_ID_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,36}$")
 
 
-@app.middleware("http")
 async def security_and_tracing_middleware(request: Request, call_next):
     # Sanitize and assign request ID
     raw_req_id = request.headers.get("X-Request-ID", "")
@@ -134,11 +114,6 @@ async def security_and_tracing_middleware(request: Request, call_next):
     return response
 
 
-# Mount official MCP Streamable HTTP routes (/mcp for POST, GET, DELETE)
-for route in sdk_mcp_app.routes:
-    app.routes.append(route)
-
-
 # --- Strict Incident Status Enum & In-Memory Audit Ledger ---
 class IncidentStatus(str, Enum):
     PENDING_OPERATOR_APPROVAL = "PENDING_OPERATOR_APPROVAL"
@@ -164,9 +139,12 @@ class IncidentRecord(BaseModel):
 # In-memory incident ledger (auditable session record, not claimed to be an immutable blockchain)
 active_incidents: Dict[str, IncidentRecord] = {}
 
+# Dedicated API router for application endpoints
+api_router = APIRouter()
+
 
 # --- Health & Runtime Telemetry ---
-@app.get("/health")
+@api_router.get("/health")
 def health_check():
     bedrock_status = bedrock_agent.get_runtime_status()
     return {
@@ -182,7 +160,7 @@ def health_check():
     }
 
 
-@app.get("/api/runtime")
+@api_router.get("/api/runtime")
 def runtime_telemetry():
     return {
         "bedrock": bedrock_agent.get_runtime_status(),
@@ -198,7 +176,7 @@ def runtime_telemetry():
 
 
 # --- Deprecated Legacy SSE Transport (Compatibility Only) ---
-@app.get("/mcp/sse", deprecated=True)
+@api_router.get("/mcp/sse", deprecated=True)
 async def deprecated_mcp_sse_endpoint():
     """Explicitly deprecated legacy standalone SSE route.
     Provided for backwards compatibility only.
@@ -240,14 +218,14 @@ async def deprecated_mcp_sse_endpoint():
 
 
 # --- Smart Entry Simulator APIs ---
-@app.get("/api/scenarios")
-@app.get("/api/ring/scenarios")
+@api_router.get("/api/scenarios")
+@api_router.get("/api/ring/scenarios")
 def list_scenarios():
     return smart_entry_simulator.SCENARIOS
 
 
-@app.post("/api/events/trigger/{scenario_id}")
-@app.post("/api/ring/trigger/{scenario_id}")
+@api_router.post("/api/events/trigger/{scenario_id}")
+@api_router.post("/api/ring/trigger/{scenario_id}")
 def trigger_scenario(scenario_id: str):
     try:
         event = smart_entry_simulator.trigger_scenario(scenario_id)
@@ -256,21 +234,21 @@ def trigger_scenario(scenario_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.get("/api/events")
-@app.get("/api/ring/events")
+@api_router.get("/api/events")
+@api_router.get("/api/ring/events")
 def get_events(limit: int = 10):
     events = smart_entry_simulator.get_latest_events(limit)
     return [e.model_dump() for e in events]
 
 
-@app.get("/api/devices")
-@app.get("/api/ring/devices")
+@api_router.get("/api/devices")
+@api_router.get("/api/ring/devices")
 def get_devices():
     return smart_entry_simulator.get_device_catalog()
 
 
 # --- Incident Operator Sequence & Human Approval Gate ---
-@app.post("/api/agent/analyze/{event_id}")
+@api_router.post("/api/agent/analyze/{event_id}")
 async def analyze_event(event_id: str, request: Request):
     """Sequence Step 2-3: Observe evidence & Analyze via Bedrock tool.
     Creates incident record strictly at PENDING_OPERATOR_APPROVAL.
@@ -319,7 +297,7 @@ class ApprovalRequest(BaseModel):
     )
 
 
-@app.post("/api/operator/approve/{incident_id}")
+@api_router.post("/api/operator/approve/{incident_id}")
 async def approve_incident(incident_id: str, payload: ApprovalRequest = ApprovalRequest()):
     """Human Approval Gate -> Execute Simulation -> Verify Outcome.
     Guarded by:
@@ -395,7 +373,7 @@ async def approve_incident(incident_id: str, payload: ApprovalRequest = Approval
     }
 
 
-@app.post("/api/operator/reject/{incident_id}")
+@api_router.post("/api/operator/reject/{incident_id}")
 async def reject_incident(incident_id: str):
     """Operator explicitly dismisses / rejects recommendation.
     Guarded by:
@@ -414,7 +392,7 @@ async def reject_incident(incident_id: str):
             "incident": incident.model_dump(),
         }
 
-    # Safe failure: cannot reject an incident that was already approved and executed
+    # Safe failure: cannot reject an incident that has already been approved and executed
     if incident.status == IncidentStatus.SIMULATION_APPROVED:
         raise HTTPException(
             status_code=409,
@@ -426,13 +404,13 @@ async def reject_incident(incident_id: str):
     return {"status": "success", "message": "Incident recommendation rejected.", "incident": incident.model_dump()}
 
 
-@app.get("/api/incidents")
+@api_router.get("/api/incidents")
 def list_incidents():
     return [inc.model_dump() for inc in active_incidents.values()]
 
 
 # --- Triage Pipeline (STOPS AT PENDING_OPERATOR_APPROVAL) ---
-@app.post("/api/agent/triage/{scenario_id}")
+@api_router.post("/api/agent/triage/{scenario_id}")
 async def run_triage_sequence(scenario_id: str, request: Request):
     """Runs sensor trigger and Bedrock reasoning analysis.
     STRICT COMPLIANCE: Stops at PENDING_OPERATOR_APPROVAL.
@@ -482,12 +460,12 @@ async def run_triage_sequence(scenario_id: str, request: Request):
 
 
 # --- Telemetry & Friction Log ---
-@app.get("/api/mcp/history")
+@api_router.get("/api/mcp/history")
 def get_mcp_history():
     return mcp_server.protocol_history
 
 
-@app.get("/api/friction-log")
+@api_router.get("/api/friction-log")
 def get_friction_log():
     friction_log_path = BASE_DIR / "docs" / "FRICTION_LOG.md"
     if friction_log_path.exists():
@@ -495,14 +473,73 @@ def get_friction_log():
     return {"content": "Friction log is being compiled."}
 
 
-# --- Static Frontend Serving ---
-if FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
-
-
-@app.get("/")
+@api_router.get("/")
 def serve_root():
     index_file = FRONTEND_DIR / "index.html"
     if index_file.exists():
         return FileResponse(index_file)
     return HTMLResponse("<h1>AmbientOps Server Running</h1>")
+
+
+# --- Application Factory & Session-Scoped MCP Lifecycle ---
+def create_app(sdk_server: Optional[MCPServer] = None) -> FastAPI:
+    """Application factory creating a configured FastAPI application with session-scoped MCP lifecycle."""
+    current_mcp_server = sdk_server or sdk_mcp_server
+    sec_settings = mcp_server.create_transport_security()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Manages application lifecycle, instantiating a fresh MCP Streamable HTTP session manager per run."""
+        logger.info("Starting AmbientOps server lifecycle...")
+        session_manager = StreamableHTTPSessionManager(
+            app=current_mcp_server._lowlevel_server,
+            event_store=None,
+            retry_interval=None,
+            json_response=False,
+            stateless=False,
+            security_settings=sec_settings,
+        )
+        app.state.mcp_session_manager = session_manager
+        try:
+            async with session_manager.run():
+                logger.info("StreamableHTTP session manager started successfully.")
+                yield
+        finally:
+            app.state.mcp_session_manager = None
+            logger.info("Shutting down AmbientOps server lifecycle...")
+
+    app = FastAPI(
+        title=settings.app_name,
+        description="Multi-Device Incident Response Console for Alexa+ and Smart Sensors via Model Context Protocol",
+        version=settings.version,
+        lifespan=lifespan,
+    )
+
+    # CORS Middleware with explicit origins and exposed session header
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+        expose_headers=["Mcp-Session-Id", "X-Request-ID", "Content-Type", "Deprecation"],
+    )
+
+    app.middleware("http")(security_and_tracing_middleware)
+
+    # Mount dynamic MCP Streamable HTTP endpoint
+    mcp_endpoint = McpStreamableHttpEndpoint(lambda: getattr(app.state, "mcp_session_manager", None))
+    app.add_route("/mcp", mcp_endpoint, methods=["GET", "POST", "DELETE", "OPTIONS"])
+
+    # Include API routes
+    app.include_router(api_router)
+
+    # Mount static assets
+    if FRONTEND_DIR.exists():
+        app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+
+    return app
+
+
+# Default application instance for standard uvicorn entrypoint and test imports
+app = create_app()
